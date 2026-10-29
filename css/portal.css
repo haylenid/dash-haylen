@@ -1,0 +1,25 @@
+/* css/portal.css — diekstrak dari index.html (fase 4 refactor) */
+.cptabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));overflow:visible;position:sticky;top:0;z-index:20;background:var(--bg);margin-inline:-4px;padding-inline:4px}
+.cptabs button{display:flex;flex-direction:column;align-items:center;gap:3px;min-height:56px;padding:8px 4px;font-size:13px;white-space:normal;text-align:center}
+.cpinfo{display:flex;flex-direction:column;gap:10px;padding:14px;border-radius:16px;background:var(--surface);border:1px solid var(--line);box-shadow:0 1px 2px rgba(11,22,48,.05)}
+.cpn b{display:block;font-size:19px;font-family:var(--f-display);line-height:1.2}
+.cpn span{color:var(--muted);font-size:13px}
+.cpd{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.cpd>div{background:var(--surface-2);border-radius:12px;padding:9px 11px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.cpd small{font-size:11px;color:var(--muted);font-weight:600}
+.cpd b{font-size:14px;font-family:var(--f-mono)}
+.cp{width:100%;max-width:560px;margin-inline:auto}
+.bub.me{display:block;padding:8px 12px;border-top:0;margin-top:0}
+.cp input,.cp select,.cp textarea{font-size:16px;min-height:46px}
+.cp .btn{min-height:46px}
+.cp .btn.sm{min-height:38px}
+.cp .card{padding:14px;border-radius:16px}
+.cp .li{padding:12px}
+.cp .cpbtn{width:100%;min-height:50px;font-size:15px}
+.cp .chat{max-height:52dvh;min-height:180px}
+.cp .bub{max-width:88%;font-size:14.5px}
+.cpsend{position:sticky;bottom:0;background:var(--surface);padding:8px 0 calc(8px + env(safe-area-inset-bottom,0px));z-index:5}
+.cpsend .btn{min-width:50px}
+.cp .chk input{width:22px;height:22px}
+.cp h1{font-size:26px}
+@media (max-width:420px){.cpn b{font-size:17px}.cpd b{font-size:13px}.cp .main,.cp{gap:12px}}
