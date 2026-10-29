@@ -83,7 +83,7 @@ function shareCanvas(c,from,days){
  const cg=g.createLinearGradient(tx,0,tx+tw,0);cg.addColorStop(0,'#0B1630');cg.addColorStop(1,'#1D3270');
  g.save();g.shadowColor='rgba(11,22,48,.25)';g.shadowBlur=26;g.shadowOffsetY=10;g.fillStyle=cg;rr(tx,ctaY,tw,168,30);g.fill();g.restore();
  g.textAlign='left';g.fillStyle='#fff';g.font=F(800,28);g.fillText('Pilih hari dan sesi yang masih Tersedia',tx+38,ctaY+62);
- g.fillStyle='#C9D6F5';g.font=F(500,19);g.fillText('Kirim pilihan Anda ke admin Number Six Running',tx+38,ctaY+98);g.fillText('untuk memesan sesi latihan.',tx+38,ctaY+126);
+ g.fillStyle='#C9D6F5';g.font=F(500,19);g.fillText('Kirim pilihan Anda ke admin Haylen',tx+38,ctaY+98);g.fillText('untuk memesan sesi latihan.',tx+38,ctaY+126);
  g.fillStyle='#F81A73';rr(tx+tw-232,ctaY+52,194,64,32);g.fill();g.fillStyle='#fff';g.font=F(800,19);g.textAlign='center';g.fillText('Booking via admin',tx+tw-135,ctaY+91);
  g.fillStyle='#8592A8';g.font=F(500,14);g.fillText('Jadwal dapat berubah sewaktu-waktu  ·  Diperbarui '+fmtD(TODAY)+' '+nowS,W/2,H-30);
  return cv;

@@ -6,10 +6,10 @@ import { store } from './store.js';
 import { COACHES } from './constants.js';
 
 // Basis URL backend.
-const API_BASE = 'https://api.denisbergkam.com/api/dbn6sport/v1';
+const API_BASE = 'https://api.denisbergkam.com/api/haylen/v1';
 
 // Token JWT disimpan di localStorage (bertahan antar refresh).
-const TOKEN_KEY = 'n6r-token';
+const TOKEN_KEY = 'haylen-token';
 let apiToken = null;
 try { apiToken = localStorage.getItem(TOKEN_KEY) || null; } catch (e) {}
 let apiMode = false;
@@ -22,7 +22,7 @@ async function apiLogin(login_id, password) {
   apiToken = login.token;
   try {
     localStorage.setItem(TOKEN_KEY, apiToken);
-    if (login.user) localStorage.setItem('n6r-user', JSON.stringify(login.user));
+    if (login.user) localStorage.setItem('haylen-user', JSON.stringify(login.user));
   } catch (e) {}
   return login;
 }
@@ -30,11 +30,11 @@ async function apiLogin(login_id, password) {
 function apiLogout() {
   apiToken = null;
   apiMode = false;
-  try { localStorage.removeItem(TOKEN_KEY); localStorage.removeItem('n6r-user'); } catch (e) {}
+  try { localStorage.removeItem(TOKEN_KEY); localStorage.removeItem('haylen-user'); } catch (e) {}
 }
 // Info user yang login (dari backend).
 function apiUser() {
-  try { return JSON.parse(localStorage.getItem('n6r-user') || 'null'); } catch (e) { return null; }
+  try { return JSON.parse(localStorage.getItem('haylen-user') || 'null'); } catch (e) { return null; }
 }
 
 // Sesi kadaluarsa di tengah sesi: 401 dari aksi apa pun -> logout + login ulang.
@@ -97,7 +97,7 @@ const tReport = (r, uidById) => {
   delete o.client_id; delete o.plan_km;
   if (r.correction) o.fix = { by: r.correction.by, text: r.correction.text, at: r.correction.at ? new Date(r.correction.at) : null };
   delete o.correction;
-  if (!o.missed && uidById[o.cid]) o.sw = 'https://numbersix.example/sw/' + uidById[o.cid] + '/' + o.date;
+  if (!o.missed && uidById[o.cid]) o.sw = 'https://haylen.example/sw/' + uidById[o.cid] + '/' + o.date;
   return o;
 };
 const tTx = t => {

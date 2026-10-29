@@ -93,7 +93,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&appState.modal){app
  try{
    const u=apiUser();
    if(u&&u.role&&ROLE[u.role])appState.role=u.role;
-   const th=localStorage.getItem('nsr-theme');if(th==='light'||th==='dark'||th==='system')appState.theme=th;
+   const th=localStorage.getItem('haylen-theme');if(th==='light'||th==='dark'||th==='system')appState.theme=th;
  }catch(e){}
  if(appState.role==='coach'){const mid=meId();appState.sched=mid;appState.cal=mid;appState.share=mid}
  const hm=location.hash.match(/^#c=([A-Za-z0-9_-]+)/);
@@ -101,7 +101,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&appState.modal){app
  const appEl=document.getElementById('app');
  if(appEl)appEl.innerHTML='<p class="sub" style="padding:48px;text-align:center">Memuat data…</p>';
  // Link portal publik: tanpa sesi login -> langsung dashboard klien
- // (kredensialnya token acak di hash; uid N6-xxxx tidak berlaku di sini).
+ // (kredensialnya token acak di hash; uid HY-xxxx tidak berlaku di sini).
  if(hm && !hasToken()){ bootPortal(hm[1]); return; }
  // Belum login -> tampilkan layar login
  if(!hasToken()){ renderLogin(); return; }
@@ -156,7 +156,7 @@ function renderLogin(){
  const appEl=document.getElementById('app');
  appEl.innerHTML=`<div style="min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:24px">
  <form id="login-form" style="width:100%;max-width:340px" autocomplete="off">
- <h1 style="font-size:22px;margin:0 0 4px">Number Six Running</h1>
+ <h1 style="font-size:22px;margin:0 0 4px">Haylen Swimming Club</h1>
  <p class="sub" style="margin:0 0 20px">Masuk untuk mengelola</p>
  <label class="sub" style="display:block;margin-bottom:4px">ID Login</label>
  <input name="login_id" required autofocus style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--bg2);color:inherit;margin-bottom:12px" />

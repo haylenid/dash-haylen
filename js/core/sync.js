@@ -4,7 +4,7 @@ import { TODAY, iso } from './helpers.js';
 import { appState, nextClientUid, store } from './store.js';
 import { isApiMode } from './api.js';
 
-const SYNC_KEY='nsr-sync-v1';
+const SYNC_KEY='haylen-sync-v1';
 let lastSyncPayload='';
 const jsonReplacer=function(k,v){const o=this[k];return o instanceof Date?{$d:o.toISOString()}:v};
 const jsonReviver=(k,v)=>v&&typeof v==='object'&&typeof v.$d==='string'?new Date(v.$d):v;

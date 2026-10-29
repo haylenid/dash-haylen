@@ -147,7 +147,7 @@ function invoiceCanvas(d){
  g.fillStyle='#fff';g.font=F(700,20);ls('2px');g.fillText('TOTAL TAGIHAN',tx+40,y+54);ls('0px');g.font=F(800,50);g.textAlign='right';g.fillText(formatRupiah(d.price),tx+tw-40,y+88);g.textAlign='left';
  y=906;card(tx,y,tw,150,28);
  g.fillStyle='#0B1630';g.font=F(800,22);g.fillText('Informasi pembayaran',tx+36,y+52);
- g.fillStyle='#55637E';g.font=F(500,18);g.fillText('Mohon konfirmasi pembayaran ke admin Number Six Running.',tx+36,y+90);g.fillText('Terima kasih sudah berlatih bersama kami.',tx+36,y+120);
+ g.fillStyle='#55637E';g.font=F(500,18);g.fillText('Mohon konfirmasi pembayaran ke admin Haylen.',tx+36,y+90);g.fillText('Terima kasih sudah berlatih bersama kami.',tx+36,y+120);
  g.textAlign='center';g.fillStyle='#8592A8';g.font=F(500,14);g.fillText('Invoice ini dibuat otomatis pada '+fmtD(TODAY)+' '+hhmm(new Date()),W/2,H-40);
  return cv}
 ACT.dlinvoice=async()=>{
@@ -155,7 +155,7 @@ ACT.dlinvoice=async()=>{
  if(!f.reportValidity())return;
  try{
   const fd=new FormData(f),p=findProgramById(fd.get('pid')),id=fd.get('id'),k=id?findClientById(id):null,uid=k?k.uid:nextClientUid();
-  const paketSemi=isSemi(p)&&(fd.get('name2')||'').trim(),d={name:fd.get('name').trim()+(paketSemi?' & '+fd.get('name2').trim():''),uid,no:'INV-'+iso(TODAY).replace(/-/g,'')+'-'+uid.replace('N6-',''),prog:p.name,unit:(p.unit||'')+(paketSemi?' · 2 peserta':''),price:p.price,start:fd.get('start'),end:fd.get('end')};
+  const paketSemi=isSemi(p)&&(fd.get('name2')||'').trim(),d={name:fd.get('name').trim()+(paketSemi?' & '+fd.get('name2').trim():''),uid,no:'INV-'+iso(TODAY).replace(/-/g,'')+'-'+uid.replace('HY-',''),prog:p.name,unit:(p.unit||'')+(paketSemi?' · 2 peserta':''),price:p.price,start:fd.get('start'),end:fd.get('end')};
   try{await Promise.all(['500','600','700','800'].map(w=>document.fonts.load(w+' 20px Montserrat')))}catch(e){}await awaitLogo();
   const cv=invoiceCanvas(d),a=document.createElement('a');a.href=cv.toDataURL('image/jpeg',.92);a.download='invoice-'+slug(d.name)+'-'+iso(TODAY)+'.jpg';document.body.appendChild(a);a.click();a.remove();
   logAct('mencetak invoice '+d.name);toast('Invoice diunduh sebagai JPG');

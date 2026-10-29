@@ -4,13 +4,13 @@ import { TODAY, addD, dIdx, first, fmtD, iso, minsAgo, parseDate } from './helpe
 
 const store={};
 store.members=[
- {id:'u1',name:'Bima Wirawan',role:'owner',login:'bima',email:'bima@numbersix.example',wa:'0812-3456-7801'},
- {id:'u2',name:'Sari Anggraini',role:'admin',login:'sari.admin',email:'sari@numbersix.example',wa:'0812-3456-7802'},
- {id:'u3',name:'Hendra Kusuma',role:'head',login:'hendra',email:'hendra@numbersix.example',wa:'0812-3456-7803'},
- {id:'u4',name:'Dimas Pratama',role:'coach',login:'dimas',email:'dimas@numbersix.example',wa:'0812-3456-7804'},
- {id:'u5',name:'Lestari Ayu',role:'coach',login:'lestari',email:'lestari@numbersix.example',wa:'0812-3456-7805'},
- {id:'u6',name:'Rangga Putra',role:'coach',login:'rangga',email:'rangga@numbersix.example',wa:'0812-3456-7806'},
- {id:'u7',name:'Maya Octaviani',role:'coach',login:'maya',email:'maya@numbersix.example',wa:'0812-3456-7807'}
+ {id:'u1',name:'Bima Wirawan',role:'owner',login:'bima',email:'bima@haylen.example',wa:'0812-3456-7801'},
+ {id:'u2',name:'Sari Anggraini',role:'admin',login:'sari.admin',email:'sari@haylen.example',wa:'0812-3456-7802'},
+ {id:'u3',name:'Hendra Kusuma',role:'head',login:'hendra',email:'hendra@haylen.example',wa:'0812-3456-7803'},
+ {id:'u4',name:'Dimas Pratama',role:'coach',login:'dimas',email:'dimas@haylen.example',wa:'0812-3456-7804'},
+ {id:'u5',name:'Lestari Ayu',role:'coach',login:'lestari',email:'lestari@haylen.example',wa:'0812-3456-7805'},
+ {id:'u6',name:'Rangga Putra',role:'coach',login:'rangga',email:'rangga@haylen.example',wa:'0812-3456-7806'},
+ {id:'u7',name:'Maya Octaviani',role:'coach',login:'maya',email:'maya@haylen.example',wa:'0812-3456-7807'}
 ];
 store.programs=[
  {id:'p1',name:'Marathon 16 Minggu',price:6500000,unit:'16 minggu',wk:16,lvl:1},
@@ -21,7 +21,7 @@ store.programs=[
  {id:'p6',name:'Paket Berdua 8 Minggu',price:4000000,unit:'8 minggu',wk:8,lvl:.6,peserta:2,fee:60000}
 ];
 const findProgramById=id=>store.programs.find(p=>p.id===id)||{id:id||'',name:'(tanpa program)',price:0,unit:'',wk:0,lvl:0,fee:0,del:true};
-const nextClientUid=()=>'N6-'+(1001+Math.max(-1,...store.clients.map(c=>parseInt(String(c.uid||'').slice(3))-1001||0))+1);
+const nextClientUid=()=>'HY-'+(1001+Math.max(-1,...store.clients.map(c=>parseInt(String(c.uid||'').slice(3))-1001||0))+1);
 const findClientByUid=s=>{const k=String(s||'').trim().toUpperCase().replace(/\s+/g,'');return k?store.clients.find(c=>String(c.uid||'').toUpperCase()===k):null};
 const SEED_CLIENTS=[
  ['Aditya Nugroho',0,-70,1,'Prima',0,186,330],['Putri Maharani',1,-40,2,'Prima',1,190,372],
@@ -33,7 +33,7 @@ const SEED_CLIENTS=[
  ['Eko Prasetyo',0,-125,3,'Prima',0,183,342],['Wulan Sari',3,-31,4,'Prima',0,193,410],
  ['Dani Kurniawan',2,-75,0,'Prima',0,188,400],['Tiara Anindya',1,-5,1,'Prima',0,192,382]
 ];
-store.clients=SEED_CLIENTS.map((r,i)=>({id:'cl'+(i+1),uid:'N6-'+(1001+i),name:r[0],pid:store.programs[r[1]].id,start:iso(addD(TODAY,r[2])),coach:COACHES[r[3]],cond:r[4],renew:!!r[5],hrmax:r[6],mp:r[7],arch:null}));
+store.clients=SEED_CLIENTS.map((r,i)=>({id:'cl'+(i+1),uid:'HY-'+(1001+i),name:r[0],pid:store.programs[r[1]].id,start:iso(addD(TODAY,r[2])),coach:COACHES[r[3]],cond:r[4],renew:!!r[5],hrmax:r[6],mp:r[7],arch:null}));
 store.clients[12].arch=iso(addD(TODAY,-6));
 store.clients[13].arch=iso(addD(TODAY,-3));
 store.clients[14].arch=iso(addD(TODAY,-1));
@@ -93,8 +93,8 @@ store.clients.filter(c=>!c.arch&&getClientStatus(c)!=='Selesai'&&c.cond!=='Istir
   store.reports.push(r);
  }
 });
-store.clients.forEach(c=>{c.sw='https://numbersix.example/sw/'+c.uid});
-store.reports.forEach(r=>{if(!r.missed&&parseInt(String(r.id).slice(2))%3!==0){const c=findClientById(r.cid);if(c)r.sw='https://numbersix.example/sw/'+c.uid+'/'+r.date}});
+store.clients.forEach(c=>{c.sw='https://haylen.example/sw/'+c.uid});
+store.reports.forEach(r=>{if(!r.missed&&parseInt(String(r.id).slice(2))%3!==0){const c=findClientById(r.cid);if(c)r.sw='https://haylen.example/sw/'+c.uid+'/'+r.date}});
 store.tx=[];
 let _tid=1;
 const EXP=[['Sewa Studio',1,6000000,'Sewa studio dan ruang konsultasi'],['Software & Server',5,850000,'Langganan aplikasi dan server'],['Iklan',8,0,'Iklan Instagram dan Strava'],['Perlengkapan',15,0,'Cone, bib, dan perlengkapan sesi'],['Gaji Admin',25,5000000,'Gaji admin bulanan']];

@@ -6,7 +6,7 @@ import { ACT, CONF } from './core/registry.js';
 import { appState, findProgramById, store } from './core/store.js';
 import { navigateTo, render, toast } from './ui/shell.js';
 
-function savePreferences(){try{localStorage.setItem('gf-prefs',JSON.stringify({role:appState.role,theme:appState.theme}));localStorage.setItem('nsr-theme',appState.theme)}catch(e){}}
+function savePreferences(){try{localStorage.setItem('gf-prefs',JSON.stringify({role:appState.role,theme:appState.theme}));localStorage.setItem('haylen-theme',appState.theme)}catch(e){}}
 function applyTheme(){const r=document.documentElement;if(appState.theme==='system')r.removeAttribute('data-theme');else r.setAttribute('data-theme',appState.theme)}
 function ensurePage(){if(!(canAccess(appState.page)||appState.page==='setting'))appState.page='beranda'}
 Object.assign(ACT,{
