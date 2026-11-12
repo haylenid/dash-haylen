@@ -1,7 +1,7 @@
 /* js/core/derived.js — diekstrak otomatis dari index.html (fase 4 refactor) */
 import { COACHES } from './constants.js';
 import { MONTHS, TODAY, addD, dIdx, esc, fmtD, hhmm, iso, parseDate, sum } from './helpers.js';
-import { appState, findClientById, findProgramById, getClientEndDate, getClientStatus, store } from './store.js';
+import { appState, feeFor, findClientById, findProgramById, getClientEndDate, getClientStatus, store } from './store.js';
 import { activePrograms, perRange, pill } from '../ui/components.js';
 
 const inRange=(k,days)=>{const d=parseDate(k);if(days&&typeof days==='object')return d>=days.a&&d<=days.b;if(typeof days==='string'){const r=perRange();return d>=r.a&&d<=r.b}return d<=TODAY&&d>addD(TODAY,-days)};
@@ -60,6 +60,11 @@ function getSessionAttendance(days,coach){
   const gnti=(store.makeup||[]).filter(t=>t.coach===coachId&&t.date===k&&t.time===time);
   if(!bs.length&&!titipan.length&&!gnti.length){out.push({date:k,cid:null,client:'-',coach:coachId,pid:null,fee:0});return}
   const seen=new Set();
+  // Tarif per kota: komisi sesi ikut kota KLIEN (feeFor: timpaan kota klien,
+  // jatuh ke tarif bawaan program bila kota itu tidak ditimpa). Klien tanpa
+  // kota: sesinya BELUM BISA DIHITUNG — fee 0 + ditandai noCity (bukan
+  // diam-diam memakai tarif bawaan).
+  const sesFee=c=>c.city_id?feeFor(c.pid,c.city_id):0;
   bs.forEach(b=>{
    const c=findClientById(b.client);
    if(!c||seen.has(c.id))return;
@@ -69,7 +74,7 @@ function getSessionAttendance(days,coach){
    // Komisi Bulanan Fase A: sesi setelah tanggal selesai klien juga tidak dihitung
    // (sebelumnya bocor selama booking klien belum dihapus).
    if(k>getClientEndDate(c))return;
-   out.push({date:k,cid:c.id,client:c.name,coach:coachId,pid:c.pid,fee:(findProgramById(c.pid)||{}).fee||0});
+   out.push({date:k,cid:c.id,client:c.name,coach:coachId,pid:c.pid,fee:sesFee(c),noCity:!c.city_id});
   });
   titipan.forEach(t=>{
    const c=findClientById(t.client);
@@ -77,7 +82,7 @@ function getSessionAttendance(days,coach){
    seen.add(c.id);
    if(c.start&&k<c.start)return;
    if(k>getClientEndDate(c))return;
-   out.push({date:k,cid:c.id,client:c.name,coach:coachId,pid:c.pid,fee:(findProgramById(c.pid)||{}).fee||0,titip:true,from:t.from});
+   out.push({date:k,cid:c.id,client:c.name,coach:coachId,pid:c.pid,fee:sesFee(c),noCity:!c.city_id,titip:true,from:t.from});
   });
   gnti.forEach(t=>{
    const c=findClientById(t.client);
@@ -85,7 +90,7 @@ function getSessionAttendance(days,coach){
    seen.add(c.id);
    if(c.start&&k<c.start)return;
    if(k>getClientEndDate(c))return;
-   out.push({date:k,cid:c.id,client:c.name,coach:coachId,pid:c.pid,fee:(findProgramById(c.pid)||{}).fee||0,makeup:true});
+   out.push({date:k,cid:c.id,client:c.name,coach:coachId,pid:c.pid,fee:sesFee(c),noCity:!c.city_id,makeup:true});
   });
  });
  return out;
@@ -125,8 +130,12 @@ function scheduledSessions(c,a,b){
  });
  return n;
 }
-function getCommissionData(days){
- const ses=getSessionAttendance(days);
+function getCommissionData(days,city){
+ // city = id kota untuk menyaring tampilan (pemilik memilih di Komisi);
+ // null/'' = semua kota. Sesi disaring lewat kota kliennya.
+ const sesAll=getSessionAttendance(days);
+ const ses=city?sesAll.filter(x=>{const c=findClientById(x.cid);return c&&c.city_id===city}):sesAll;
+ const nNoCity=ses.filter(x=>x.noCity).length;
  const byCoach=COACHES.map(c=>{const sc=ses.filter(x=>x.coach===c),ks=sum(sc.map(x=>x.fee));return{c,kom:ks,komSes:ks,nSes:sc.length}});
  const byProg=activePrograms().map(p=>{const sp=ses.filter(x=>x.pid===p.id);return{p,kom:sum(sp.map(x=>x.fee)),nSes:sp.length}});
  // Paket Pertemuan: sesi KUMULATIF dari tanggal mulai klien s/d akhir periode
@@ -137,7 +146,7 @@ function getCommissionData(days){
  // F1.2: baris per klien — klien aktif selalu tampil (walau belum ada sesi);
  // klien non-aktif (arsip/selesai) tampil bila punya sesi pada periode ini.
  const isRange=!!(days&&typeof days==='object');
- const byClient=store.clients.map(cl=>{
+ const byClient=store.clients.filter(cl=>!city||cl.city_id===city).map(cl=>{
   const sc=ses.filter(x=>x.cid===cl.id);
   const aktif=!cl.arch&&getClientStatus(cl)!=='Selesai';
   // Mode bulan: klien yang masa programnya sama sekali di luar bulan terpilih
@@ -171,11 +180,11 @@ function getCommissionData(days){
   // Klien yang sesi-sesinya dilatih pengganti tetap tampil di grup pemiliknya
   // sebagai baris progres (komisi pemilik Rp 0 untuk sesi titipan).
   if(sc.length&&!perCoach[cl.coach])perCoach[cl.coach]={coach:cl.coach,nSes:0,kom:0,lastSes:lastKlien};
-  return{cl,c:cl.id,coach:cl.coach,pid:cl.pid,nSes:sc.length,nJadwal:isRange?scheduledSessions(cl,days.a,days.b):0,kom:sum(sc.map(x=>x.fee)),fee:(findProgramById(cl.pid)||{}).fee||0,perCoach:Object.values(perCoach),pkgTotal:pkg,cumSes};
+  return{cl,c:cl.id,coach:cl.coach,pid:cl.pid,nSes:sc.length,nJadwal:isRange?scheduledSessions(cl,days.a,days.b):0,kom:sum(sc.map(x=>x.fee)),fee:cl.city_id?feeFor(cl.pid,cl.city_id):0,noCity:!cl.city_id,nNoCitySes:sc.filter(x=>x.noCity).length,perCoach:Object.values(perCoach),pkgTotal:pkg,cumSes};
  }).filter(Boolean);
  // Komisi Bulanan Fase A: baris diurutkan terbaru -> terlama (tanggal mulai klien).
  byClient.sort((x,y)=>x.cl.start<y.cl.start?1:x.cl.start>y.cl.start?-1:(x.cl.name<y.cl.name?-1:1));
- return{byCoach,byProg,byClient}}
+ return{byCoach,byProg,byClient,nNoCity}}
 // Paket Perbaikan Komisi (masalah 1-3): grup Performa per coach PENGHASIL.
 // Sumbernya data getCommissionData yang sama (byCoach + byClient.perCoach):
 // - SEMUA coach dari byCoach selalu hadir sebagai grup, walau tanpa perolehan

@@ -114,7 +114,7 @@ const tActivity = a => ({ ...a, t: D(a.t) });
 async function apiBoot() {
   if (!apiToken) { apiMode = false; return false; }
   try {
-    const [members, programs, clients, tx, reqs, team, bcs, settings, tpl, activity, sched, att, cprof, swl, compay, titip, makeup] = await Promise.all([
+    const [members, programs, clients, tx, reqs, team, bcs, settings, tpl, activity, sched, att, cprof, swl, compay, titip, makeup, cities, rates] = await Promise.all([
       apiGet('/members'),
       apiGet('/programs'),
       apiGet('/clients?status=semua'),
@@ -132,12 +132,17 @@ async function apiBoot() {
       apiGet('/commission-payments').catch(() => []),
       apiGet('/titip').catch(() => []),
       apiGet('/makeup').catch(() => []),
+      apiGet('/cities').catch(() => []),
+      apiGet('/program-rates').catch(() => []),
     ]);
     const repLists = await Promise.all(clients.map(c => apiGet('/clients/' + c.id + '/reports').catch(() => [])));
     const dmLists = await Promise.all(clients.map(c => apiGet('/messages/dm/' + c.id).catch(() => [])));
     // isi store (bentuk frontend)
     store.members = members;
     store.programs = programs;
+    // Tarif per kota: daftar kota + timpaan tarif (kosong bila backend lama)
+    store.cities = Array.isArray(cities) ? cities : [];
+    store.rates = Array.isArray(rates) ? rates : [];
     store.clients = clients.map(tClient);
     const uidById = {};
     store.clients.forEach(c => { uidById[c.id] = c.uid; });
@@ -232,7 +237,7 @@ async function apiBoot() {
   }
 }
 
-export { API_BASE, apiBoot, apiDel, apiGet, apiPatch, apiPost, isApiMode, hasToken, apiLogin, apiLogout, apiUser,
+export { API_BASE, apiBoot, apiDel, apiGet, apiPatch, apiPost, apiPut, isApiMode, hasToken, apiLogin, apiLogout, apiUser,
   apiSaveClient, apiSaveTransaction, apiAddMember, apiSaveProgram, apiSendTeamMessage, apiSendDm,
   apiSendBroadcast, apiSendPortalMessage, apiPortalLoad, apiPortalSaveLink, apiSubmitCorrection, apiLog, apiSavePattern, apiAddBooking,
   apiSaveAttendance, apiSaveCoachProfile, apiSaveShareLink, apiSaveRequest, apiSaveTemplate,

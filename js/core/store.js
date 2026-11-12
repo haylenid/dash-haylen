@@ -21,6 +21,14 @@ store.programs=[
  {id:'p6',name:'Paket Berdua 8 Minggu',price:4000000,unit:'8 minggu',wk:8,lvl:.6,peserta:2,fee:60000}
 ];
 const findProgramById=id=>store.programs.find(p=>p.id===id)||{id:id||'',name:'(tanpa program)',price:0,unit:'',wk:0,lvl:0,fee:0,del:true};
+/* Tarif per kota (2026-11-12): daftar kota + timpaan tarif program per kota.
+   price/fee NULL pada timpaan = pakai tarif bawaan program. */
+store.cities=[];
+store.rates=[];
+const findCityById=id=>store.cities.find(c=>c.id===id)||null;
+const rateFor=(pid,cityId)=>{const p=findProgramById(pid);const r=cityId?(store.rates||[]).find(x=>x.program_id===pid&&x.city_id===cityId):null;return{price:r&&r.price!=null?r.price:p.price,fee:r&&r.fee!=null?r.fee:p.fee}};
+const feeFor=(pid,cityId)=>rateFor(pid,cityId).fee;
+const priceFor=(pid,cityId)=>rateFor(pid,cityId).price;
 const nextClientUid=()=>'HY-'+(1001+Math.max(-1,...store.clients.map(c=>parseInt(String(c.uid||'').slice(3))-1001||0))+1);
 const findClientByUid=s=>{const k=String(s||'').trim().toUpperCase().replace(/\s+/g,'');return k?store.clients.find(c=>String(c.uid||'').toUpperCase()===k):null};
 const SEED_CLIENTS=[
@@ -142,7 +150,7 @@ store.acl={
  head:{beranda:'full',klien:'full',coach:'full',koreksi:'full',program:'full',pesan:'full',absensi:'full',komisi:'none',keuangan:'none',laporan:'mask',anggota:'none',setting:'full',progress:'none'},
  coach:{beranda:'full',klien:'full',coach:'full',koreksi:'none',program:'full',pesan:'full',absensi:'full',komisi:'full',keuangan:'none',laporan:'none',anggota:'none',setting:'full',progress:'none'}
 };
-const appState={role:'owner',page:'beranda',tab:0,nav:false,modal:null,q:'',cf:'all',per:30,komY:null,komM:null,tp:'bulan',gate:false,theme:'system',
+const appState={role:'owner',page:'beranda',tab:0,nav:false,modal:null,q:'',cf:'all',per:30,komY:null,komM:null,komcity:'',tp:'bulan',gate:false,theme:'system',
  kcoach:'all',clcoach:'all',kweek:0,kdate:iso(TODAY),sched:'u4',cal:'u4',chat:'cl1',editfix:null,rep:'client',repPer:30,confirm:null,syncAt:new Date(),focus:null,openMark:null,share:'u4',shareDays:7,bcTo:'all',acoach:'all',adate:iso(TODAY),
  prog:{name:'Aditya Nugroho',coach:'Dimas Pratama',age:34,target:'42195',pbNow:'4:25:00',pbTarget:'4:00:00',title:'',phase:'umum',sdate:iso(TODAY),edate:iso(addD(TODAY,6)),hrmax:186,weeks:[36],start:36,inc:8,calcVol:48,detail:true,fmt:'pdf',tplId:'t1'}
 };
@@ -154,4 +162,4 @@ store.types=[
  {k:'Long Run',zone:2,day:6,pace:110,share:40}
 ];
 
-export { EXP, SEED_CLIENTS, _rid, _tid, appState, fillTemplate, findClientById, findClientByUid, findProgramById, getClientEndDate, getClientStatus, getMemberName, isSemi, nextClientUid, partnerOf, store, uniqClientId };
+export { EXP, SEED_CLIENTS, _rid, _tid, appState, feeFor, fillTemplate, findCityById, findClientById, findClientByUid, findProgramById, getClientEndDate, getClientStatus, getMemberName, isSemi, nextClientUid, partnerOf, priceFor, rateFor, store, uniqClientId };
