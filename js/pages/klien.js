@@ -148,9 +148,10 @@ function invoiceCanvas(d){
  y=738;const kg=g.createLinearGradient(tx,0,tx+tw,0);kg.addColorStop(0,'#F81A73');kg.addColorStop(1,'#29BEFF');
  g.save();g.shadowColor='rgba(248,26,115,.35)';g.shadowBlur=24;g.shadowOffsetY=10;g.fillStyle=kg;rr(tx,y,tw,130,28);g.fill();g.restore();
  g.fillStyle='#fff';g.font=F(700,20);ls('2px');g.fillText('TOTAL TAGIHAN',tx+40,y+54);ls('0px');g.font=F(800,50);g.textAlign='right';g.fillText(formatRupiah(d.price),tx+tw-40,y+88);g.textAlign='left';
- y=906;card(tx,y,tw,150,28);
+ y=906;card(tx,y,tw,180,28);
  g.fillStyle='#0B1630';g.font=F(800,22);g.fillText('Informasi pembayaran',tx+36,y+52);
  g.fillStyle='#55637E';g.font=F(500,18);g.fillText('Mohon konfirmasi pembayaran ke admin Haylen.',tx+36,y+90);g.fillText('Terima kasih sudah berlatih bersama kami.',tx+36,y+120);
+ g.fillStyle='#0B1630';g.font=F(700,18);g.fillText('BCA 0334314941 a.n. Nurul Hikam Arifah',tx+36,y+150);
  g.textAlign='center';g.fillStyle='#8592A8';g.font=F(500,14);g.fillText('Invoice ini dibuat otomatis pada '+fmtD(TODAY)+' '+hhmm(new Date()),W/2,H-40);
  return cv}
 ACT.dlinvoice=async()=>{
