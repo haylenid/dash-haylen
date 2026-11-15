@@ -130,7 +130,6 @@ function invoiceCanvas(d){
  else{g.fillStyle='#0B1630';g.font='italic 800 56px Montserrat, Arial, sans-serif';g.fillText('N6',tx+28,112)}
  const hx=tx+28+lw+26;g.fillStyle='#E3E8F2';g.fillRect(hx-14,62,2,66);
  
- g.fillStyle='#6B778C';g.font=F(600,15);ls('2px');g.fillText('COACHING LARI',hx+4,103);ls('0px');
  g.textAlign='right';g.fillStyle='#F81A73';g.font=F(800,34);ls('3px');g.fillText('INVOICE',tx+tw-28,104);ls('0px');g.textAlign='left';
  let y=214;
  g.fillStyle='#6B778C';g.font=F(700,14);ls('2px');g.fillText('DITAGIHKAN KEPADA',tx,y);g.textAlign='right';g.fillText('NO. INVOICE',tx+tw,y);ls('0px');g.textAlign='left';
@@ -159,7 +158,7 @@ ACT.dlinvoice=async()=>{
  if(!f.reportValidity())return;
  try{
   const fd=new FormData(f),p=findProgramById(fd.get('pid')),id=fd.get('id'),k=id?findClientById(id):null,uid=k?k.uid:nextClientUid();
-  const paketSemi=isSemi(p)&&(fd.get('name2')||'').trim(),d={name:fd.get('name').trim()+(paketSemi?' & '+fd.get('name2').trim():''),uid,no:'INV-'+iso(TODAY).replace(/-/g,'')+'-'+uid.replace('HY-',''),prog:p.name,unit:(p.unit||'')+(paketSemi?' · 2 peserta':''),price:p.price,start:fd.get('start'),end:fd.get('end')};
+  const paketSemi=isSemi(p)&&(fd.get('name2')||'').trim(),d={name:fd.get('name').trim()+(paketSemi?' & '+fd.get('name2').trim():''),uid,no:'INV-'+iso(TODAY).replace(/-/g,'')+'-'+uid.replace('HY-',''),prog:p.name,unit:(p.unit||'')+(paketSemi?' · 2 peserta':''),price:priceFor(p.id,fd.get('city')||(k&&k.city_id)),start:fd.get('start'),end:fd.get('end')};
   try{await Promise.all(['500','600','700','800'].map(w=>document.fonts.load(w+' 20px Montserrat')))}catch(e){}await awaitLogo();
   const cv=invoiceCanvas(d),a=document.createElement('a');a.href=cv.toDataURL('image/jpeg',.92);a.download='invoice-'+slug(d.name)+'-'+iso(TODAY)+'.jpg';document.body.appendChild(a);a.click();a.remove();
   logAct('mencetak invoice '+d.name);toast('Invoice diunduh sebagai JPG');
