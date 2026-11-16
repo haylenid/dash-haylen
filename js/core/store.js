@@ -29,6 +29,14 @@ const findCityById=id=>store.cities.find(c=>c.id===id)||null;
 const rateFor=(pid,cityId)=>{const p=findProgramById(pid);const r=cityId?(store.rates||[]).find(x=>x.program_id===pid&&x.city_id===cityId):null;return{price:r&&r.price!=null?r.price:p.price,fee:r&&r.fee!=null?r.fee:p.fee}};
 const feeFor=(pid,cityId)=>rateFor(pid,cityId).fee;
 const priceFor=(pid,cityId)=>rateFor(pid,cityId).price;
+/* Komisi semi privat custom (Haylen, 2026-11-16): angka bawaan bila program
+   maupun kotanya tidak mengatur. Rantai: tarif kota -> tarif program -> bawaan. */
+const SEMI_FEE_1 = 75000; // 1 peserta hadir
+const SEMI_FEE_2 = 85000; // 2 peserta hadir
+const semiFeesFor=(pid,cityId)=>{const p=findProgramById(pid);const r=cityId?(store.rates||[]).find(x=>x.program_id===pid&&x.city_id===cityId):null;
+ return{f1:r&&r.semi_fee_1!=null?r.semi_fee_1:(p.semi_fee_1!=null?p.semi_fee_1:SEMI_FEE_1),
+        f2:r&&r.semi_fee_2!=null?r.semi_fee_2:(p.semi_fee_2!=null?p.semi_fee_2:SEMI_FEE_2)}};
+const semiFeeLabel=(pid,cityId)=>{const f=semiFeesFor(pid,cityId);return 'Rp '+f.f1.toLocaleString('id-ID')+'–'+f.f2.toLocaleString('id-ID')};
 const nextClientUid=()=>'HY-'+(1001+Math.max(-1,...store.clients.map(c=>parseInt(String(c.uid||'').slice(3))-1001||0))+1);
 const findClientByUid=s=>{const k=String(s||'').trim().toUpperCase().replace(/\s+/g,'');return k?store.clients.find(c=>String(c.uid||'').toUpperCase()===k):null};
 const SEED_CLIENTS=[
@@ -172,4 +180,4 @@ store.types=[
  {k:'Long Run',zone:2,day:6,pace:110,share:40}
 ];
 
-export { EXP, SEED_CLIENTS, _rid, _tid, appState, feeFor, fillTemplate, findCityById, findClientById, findClientByUid, findProgramById, getClientEndDate, getClientStatus, getMemberName, isSemi, nextClientUid, pairLabel, pairMembers, partnerOf, priceFor, rateFor, store, uniqClientId };
+export { EXP, SEED_CLIENTS, _rid, _tid, appState, feeFor, fillTemplate, findCityById, findClientById, findClientByUid, findProgramById, getClientEndDate, getClientStatus, getMemberName, isSemi, nextClientUid, pairLabel, pairMembers, partnerOf, priceFor, rateFor, semiFeeLabel, semiFeesFor, store, uniqClientId };

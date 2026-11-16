@@ -1,11 +1,9 @@
 /* js/core/derived.js — diekstrak otomatis dari index.html (fase 4 refactor) */
 import { COACHES } from './constants.js';
 import { MONTHS, TODAY, addD, dIdx, esc, fmtD, hhmm, iso, parseDate, sum } from './helpers.js';
-import { appState, feeFor, findClientById, findProgramById, getClientEndDate, getClientStatus, isSemi, partnerOf, store } from './store.js';
-// Komisi semi privat (Haylen, "untuk sementara" owner 2026-11-15): fee pelatih
-// per sesi berdasarkan jumlah peserta yang hadir — angka tetap, bukan fee program.
-const SEMI_FEE_1 = 75000; // 1 peserta hadir
-const SEMI_FEE_2 = 85000; // 2 peserta hadir
+import { appState, feeFor, findClientById, findProgramById, getClientEndDate, getClientStatus, isSemi, partnerOf, semiFeeLabel, semiFeesFor, store } from './store.js';
+// Komisi semi privat (Haylen): fee pelatih per sesi berdasarkan jumlah peserta
+// yang hadir — angkanya custom per program/kota (semiFeesFor), bawaan 75.000/85.000.
 // Peserta 1 pasangan = yang dibuat lebih dulu (reg lebih kecil; seri -> id lebih kecil).
 const pairPrimary = cs => cs.slice().sort((a, b) => (a.reg || 0) - (b.reg || 0) || (a.id < b.id ? -1 : 1))[0];
 import { activePrograms, perRange, pill } from '../ui/components.js';
@@ -99,17 +97,19 @@ function getSessionAttendance(days,coach){
    if(k>getClientEndDate(c))return;
    es.push({date:k,cid:c.id,client:c.name,coach:coachId,pid:c.pid,fee:sesFee(c),noCity:!c.city_id,makeup:true});
   });
-  // Komisi semi privat: sesi pasangan dihitung SEKALI dengan fee tetap
-  // (1 hadir 75.000, 2 hadir 85.000), bukan fee program per klien.
-  // Peserta dihitung hadir kecuali ditandai 'Tidak hadir' di absensi peserta
-  // (tanpa catatan sama sekali pun dianggap hadir). Uang hanya di entri
-  // peserta 1; entri peserta 2 dihapus supaya hitungan sesi tetap 1 per sesi.
+  // Komisi semi privat: sesi pasangan dihitung SEKALI dengan fee custom
+  // program/kota (bawaan 1 hadir 75.000, 2 hadir 85.000), bukan fee program
+  // per klien. Peserta dihitung hadir kecuali ditandai 'Tidak hadir' di
+  // absensi peserta (tanpa catatan sama sekali pun dianggap hadir). Uang
+  // hanya di entri peserta 1; entri peserta 2 dihapus supaya hitungan sesi
+  // tetap 1 per sesi.
   const semiByGrp={};
   es.forEach(e=>{const c=findClientById(e.cid);if(!c||!c.grp||!isSemi(findProgramById(c.pid)))return;(semiByGrp[c.grp]=semiByGrp[c.grp]||[]).push(e)});
   Object.values(semiByGrp).forEach(g=>{
    const prim=pairPrimary(g.map(e=>findClientById(e.cid)));
    const nHadir=g.filter(e=>{const r=(store.attClient||{})[k+'|'+coachId+'|'+time+'|'+e.cid];return !(r&&r.s==='Tidak hadir')}).length;
-   const fee=nHadir>=2?SEMI_FEE_2:nHadir===1?SEMI_FEE_1:0;
+   const sf=semiFeesFor(prim.pid,prim.city_id);
+   const fee=nHadir>=2?sf.f2:nHadir===1?sf.f1:0;
    g.forEach(e=>{
     if(e.cid!==prim.id){es.splice(es.indexOf(e),1);return}
     e.fee=fee;e.noCity=false;
@@ -181,8 +181,8 @@ function getCommissionData(days,city){
   // pengganti, sehingga pembayaran klien bisa dipecah per pelatih.
   const perCoach={};sc.forEach(x=>{const g=perCoach[x.coach]||(perCoach[x.coach]={coach:x.coach,nSes:0,kom:0});g.nSes++;g.kom+=x.fee});
   const pkg=pkgSessions(findProgramById(cl.pid));
-  // Komisi semi privat: fee per sesi tetap 75.000/85.000 (bukan fee program),
-  // dan sesi semi selalu bisa dihitung (tidak bergantung kota).
+  // Komisi semi privat: fee per sesi custom program/kota (bawaan 75.000/85.000,
+  // bukan fee program), dan sesi semi selalu bisa dihitung (tidak bergantung kota).
   const semiP=isSemi(findProgramById(cl.pid));
   const cumSes=pkg&&sesCum?Math.min(sesCum.filter(x=>x.cid===cl.id).length,pkg):0;
   // Catatan titip (2026-10-22): segmen pelatih PENGGANTI membawa hitungan
@@ -207,7 +207,7 @@ function getCommissionData(days,city){
   // Klien yang sesi-sesinya dilatih pengganti tetap tampil di grup pemiliknya
   // sebagai baris progres (komisi pemilik Rp 0 untuk sesi titipan).
   if(sc.length&&!perCoach[cl.coach])perCoach[cl.coach]={coach:cl.coach,nSes:0,kom:0,lastSes:lastKlien};
-  return{cl,c:cl.id,coach:cl.coach,pid:cl.pid,nSes:sc.length,nJadwal:isRange?scheduledSessions(cl,days.a,days.b):0,kom:sum(sc.map(x=>x.fee)),fee:semiP?SEMI_FEE_2:(cl.city_id?feeFor(cl.pid,cl.city_id):0),feeLabel:semiP?'Rp 75.000–85.000':null,noCity:!cl.city_id&&!semiP,nNoCitySes:sc.filter(x=>x.noCity).length,perCoach:Object.values(perCoach),pkgTotal:pkg,cumSes};
+  return{cl,c:cl.id,coach:cl.coach,pid:cl.pid,nSes:sc.length,nJadwal:isRange?scheduledSessions(cl,days.a,days.b):0,kom:sum(sc.map(x=>x.fee)),fee:semiP?semiFeesFor(cl.pid,cl.city_id).f2:(cl.city_id?feeFor(cl.pid,cl.city_id):0),feeLabel:semiP?semiFeeLabel(cl.pid,cl.city_id):null,noCity:!cl.city_id&&!semiP,nNoCitySes:sc.filter(x=>x.noCity).length,perCoach:Object.values(perCoach),pkgTotal:pkg,cumSes};
  }).filter(Boolean);
  // Komisi semi privat: gabung baris pasangan jadi satu baris "A & B" (uang
  // sudah di baris peserta 1 lewat getSessionAttendance). Hanya bila kedua
@@ -224,7 +224,7 @@ function getCommissionData(days,city){
   const prim=pairPrimary([x.cl,y.cl])===x.cl?x:y,sec=prim===x?y:x;
   mergedUsed.add(x.c);mergedUsed.add(y.c);
   prim.label=prim.cl.name+' & '+sec.cl.name;prim.semi=true;prim.noCity=false;
-  prim.fee=SEMI_FEE_2;prim.feeLabel='Rp 75.000–85.000';
+  prim.fee=semiFeesFor(prim.cl.pid,prim.cl.city_id).f2;prim.feeLabel=semiFeeLabel(prim.cl.pid,prim.cl.city_id);
   mergedByClient.push(prim);
  });
  // Komisi Bulanan Fase A: baris diurutkan terbaru -> terlama (tanggal mulai klien).

@@ -7,6 +7,7 @@ import { appState, fillTemplate, findClientById, findClientByUid, store } from '
 import { syncBoot, syncListen } from './core/sync.js';
 import { slotPickList, slotPreview } from './pages/coach.js';
 import { clientFormSync } from './pages/klien.js';
+import { progFormSync } from './pages/komisi.js';
 import { slId, planTypeOn } from './core/shared.js';
 import { navigateTo, render, setPath, toast } from './ui/shell.js';
 import { apiBoot, apiLog, apiPortalLoad, isApiMode, hasToken, apiLogin, apiLogout, apiUser } from './core/api.js';
@@ -66,6 +67,7 @@ document.addEventListener('input',e=>{
 document.addEventListener('change',e=>{
  const t=e.target;if(!t.dataset)return;
  if(t.hasAttribute('data-cform')){clientFormSync(t);return}
+ if(t.hasAttribute('data-pform')){progFormSync(t);return}
  if(t.hasAttribute('data-tsel')){const w=document.getElementById('ctw');if(w)w.hidden=t.value!=='custom';return}
  if(t.dataset.f){appState[t.dataset.f]=t.hasAttribute('data-n')?+t.value:t.value;if(t.dataset.f==='adate'){appState.cdate=t.value;appState.pday=dIdx(parseDate(t.value))}render();return}
  if(t.hasAttribute('data-tpl')){
