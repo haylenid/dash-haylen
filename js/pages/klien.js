@@ -29,6 +29,10 @@ PAGES.klien=()=>{
  ${arch?banner('Klien yang diarsipkan dihapus permanen setelah 7 hari. Pulihkan sebelum batas waktu.'):''}
  <div class="toolbar"><input id="q" data-q type="search" placeholder="Cari nama klien" value="${esc(appState.q)}" aria-label="Cari klien">${canByCoach?`<select data-f="clcoach" aria-label="Filter coach"><option value="all">Semua coach (${store.clients.filter(c=>!!c.arch===arch).length})</option>${COACHES.map(id=>`<option value="${id}" ${appState.clcoach===id?'selected':''}>${esc(getMemberName(id))} (${store.clients.filter(c=>c.coach===id&&!!c.arch===arch).length})</option>`).join('')}</select>`:''}${arch?'':`<select data-f="cf" aria-label="Filter status"><option value="all">Semua status</option>${['Aktif','Segera berakhir','Jeda','Selesai'].map(s=>`<option ${appState.cf===s?'selected':''}>${s}</option>`).join('')}</select>`}<span class="sp"></span>${canEdit&&!arch?`<button class="btn primary" data-act="modal" data-v="client">${icon('plus',15)} Tambah klien</button>`:''}</div>
  <div class="tw dt"><table><thead><tr><th>Nama</th><th>Paket</th><th>Mulai - selesai</th><th>Coach</th><th>Status</th>${canEdit?'<th>Aksi</th>':''}</tr></thead><tbody>${rows||`<tr><td colspan="${canEdit?6:5}" class="sub">Tidak ada klien yang cocok.</td></tr>`}</tbody></table></div><div class="mlist">${mlist||'<p class="sub">Tidak ada klien yang cocok.</p>'}</div></div>`};
+/* Calon pasangan untuk "Satukan pasangan": klien aktif (bukan arsip/Selesai),
+   program & coach sama, belum punya pasangan, bukan dirinya sendiri. */
+const pasanganCandidates=(pid,coachId,selfId)=>store.clients.filter(x=>x.id!==selfId&&!x.arch&&x.pid===pid&&x.coach===coachId&&!x.grp&&getClientStatus(x)!=='Selesai');
+const pasanganOptions=(pid,coachId,selfId,sel)=>pasanganCandidates(pid,coachId,selfId).map(x=>`<option value="${x.id}" ${x.id===sel?'selected':''}>${esc(x.name)} · ${esc(x.uid||'')}</option>`).join('');
 MODALS.client=m=>{
  const ap=activePrograms();
  if(!ap.length)return sheet(m.id?'Ubah klien':'Tambah klien',`<p class="sub">Belum ada program aktif. Buat program dulu di menu Program — klien harus terdaftar pada sebuah program.</p><div class="row" style="margin-top:12px"><button class="btn primary" data-act="nav" data-v="program">Buka menu Program</button><button class="btn" data-act="close">Kembali</button></div>`);
@@ -54,6 +58,7 @@ MODALS.client=m=>{
  </div>
  <div class="peserta full fg" id="peserta2" data-semi ${paketSemi?'':'hidden'}>
   <div class="full"><h4>Peserta 2</h4>${tautanDash(pasangan)}</div>
+  ${pasangan?'':`<label class="field full"><span>Satukan dengan klien yang sudah ada (opsional)</span><select name="pasangan_id" data-cform><option value="">— Buat peserta baru (isi nama di bawah) —</option>${pasanganOptions(programOrDefault.id,coachV,m.id||'','')}</select><small class="sub">Pilih klien yang sudah terdaftar (program &amp; coach sama, belum punya pasangan) untuk menjadi Peserta 2 — tanpa membuat klien baru.</small></label>`}
   <label class="field full"><span>Nama klien ke-2</span><input id="f-cname2" name="name2" ${paketSemi?'required':''} value="${esc(dataPasangan.name)}"></label>
   <label class="field full"><span>Catatan / keterangan (opsional)</span><textarea id="f-cnote2" name="note2" rows="3" maxlength="300" placeholder="Catatan khusus untuk peserta ke-2">${esc(dataPasangan.note||'')}</textarea></label>
  </div>
@@ -66,6 +71,19 @@ function clientFormSync(t){
  const inputNama2=f.elements.name2;if(inputNama2)inputNama2.required=paketSemi;const tt=f.querySelector('#semitotal');if(tt)tt.textContent=formatRupiah(priceFor(p.id,cityV));const t1=f.querySelector('#p1title');if(t1)t1.textContent=paketSemi?'Peserta 1':'Data klien';
  if(t.name==='end'){t.dataset.touched='1';return}
  if(t.name==='pid'||t.name==='start'){const st=f.elements.start.value,en=f.elements.end;if(st&&!en.dataset.touched)en.value=iso(addD(parseDate(st),p.wk*7))}
+ /* "Satukan pasangan": daftar calon ikut program & coach yang dipilih; bila
+    pasangan dipilih, isian peserta baru dimatikan (diabaikan saat simpan). */
+ const ps=f.elements.pasangan_id;
+ if(ps){
+  if(t.name==='pid'||t.name==='coach'){
+   const cur=ps.value;
+   ps.innerHTML='<option value="">— Buat peserta baru (isi nama di bawah) —</option>'+pasanganOptions(f.elements.pid.value,f.elements.coach.value,f.elements.id.value,cur);
+   if(cur&&![...ps.options].some(o=>o.value===cur))ps.value='';
+  }
+  const linked=!!ps.value,n2=f.elements.name2,nt2=f.elements.note2;
+  if(n2){n2.disabled=linked;n2.required=paketSemi&&!linked}
+  if(nt2)nt2.disabled=linked;
+ }
 }
 FORMS.client=async f=>{
  const id=f.get('id'),start=f.get('start'),end=f.get('end');
@@ -75,8 +93,9 @@ FORMS.client=async f=>{
  const pg=findProgramById(f.get('pid')),paketSemi=isSemi(pg),trimVal=k=>(f.get(k)||'').trim();
  const dataPeserta1={name:trimVal('name'),note:trimVal('note')};
  const dataPeserta2=paketSemi?{name:trimVal('name2'),note:trimVal('note2')}:null;
+ const pasanganId=paketSemi?trimVal('pasangan_id'):'';
  if(!dataPeserta1.name){toast('Nama klien wajib diisi');return}
- if(paketSemi&&!dataPeserta2.name){toast('Isi nama klien ke-2 untuk paket 2 peserta');return}
+ if(paketSemi&&!dataPeserta2.name&&!pasanganId){toast('Isi nama klien ke-2 untuk paket 2 peserta');return}
  const api=isApiMode();
  /* buat klien: via API bila mode API (field tambahan grp/note/end diset lokal, pola sama seperti end/pbNow di fase C) */
  const buatKlienBaru=async nama=>{
@@ -86,14 +105,21 @@ FORMS.client=async f=>{
  };
  const c0=id?findClientById(id):await buatKlienBaru(dataPeserta1.name),isNew1=!id;
  let c=c0,dataPasangan=null,isNew2=false,lepas='';
- if(paketSemi){dataPasangan=partnerOf(c);if(!dataPasangan){dataPasangan=await buatKlienBaru(dataPeserta2.name);isNew2=true}c.grp=c.grp||'g'+Date.now();dataPasangan.grp=c.grp}
- else if(c.grp){const o=partnerOf(c);delete c.grp;if(o){delete o.grp;lepas=' Pasangan semi privat dilepas dan tetap tercatat sebagai klien sendiri.'}}
+ if(paketSemi){dataPasangan=partnerOf(c);if(!dataPasangan){if(pasanganId){dataPasangan=findClientById(pasanganId);if(!dataPasangan){toast('Klien pasangan tidak ditemukan');return}}else{dataPasangan=await buatKlienBaru(dataPeserta2.name);isNew2=true}}c.grp=c.grp||'g'+Date.now();dataPasangan.grp=c.grp}
+ else if(c.grp){const o=partnerOf(c);delete c.grp;if(o){delete o.grp;lepas=' Pasangan semi privat dilepas dan tetap tercatat sebagai klien sendiri.';if(api&&o.id){try{await apiSaveClient({id:o.id,grp:null})}catch(e){console.error('Gagal melepas pasangan di server:',e)}}}}
+ /* "Satukan pasangan": klien yang sudah ada ditautkan hanya lewat grp — data
+    lainnya (nama, tanggal, program) tidak diubah. */
+ if(paketSemi&&pasanganId&&api){
+  try{dataPasangan=await apiSaveClient({id:dataPasangan.id,grp:c.grp})}catch(e){toast('Gagal menautkan pasangan: '+(e.message||e));return}
+ }
  let moved='',inc='';
  const simpanSatu=async(k,o,isNew,primary)=>{
   const coachLama=!isNew&&k.coach!==coachTerpilih;
   const grp=k.grp; /* apiSaveClient me-replace objek di store -> amankan field lokal dulu */
   let cur=k;
-  if(api&&k.id)cur=await apiSaveClient({id:k.id,name:o.name,program_id:f.get('pid'),start,end,coach_id:coachTerpilih,city_id:f.get('city')});
+  /* grp WAJIB ikut ke server — tanpanya tautan pasangan hanya hidup di memori
+     browser dan hilang saat aplikasi dimuat ulang (Roni & Rono, 2026-11-16). */
+  if(api&&k.id)cur=await apiSaveClient({id:k.id,name:o.name,program_id:f.get('pid'),start,end,coach_id:coachTerpilih,city_id:f.get('city'),grp:(grp===undefined?null:grp)});
   Object.assign(cur,{name:o.name,pid:f.get('pid'),start,end,note:o.note,coach:coachTerpilih});
   if(grp)cur.grp=grp;else delete cur.grp;
   /* ganti coach: sesi lama di jadwal coach sebelumnya dilepas agar tidak dobel/yatim (sama seperti menu Jadwal coach) */
@@ -101,7 +127,8 @@ FORMS.client=async f=>{
   /* pemasukan otomatis: klien baru = transaksi masuk sebesar harga program (tercatat hari ini) */
   /* paket 2 peserta: satu pembayaran saja, dicatat di peserta 1 dengan nama gabungan */
   if(pg&&primary){
-   const namaGabungan=paketSemi&&dataPeserta2?dataPeserta1.name+' & '+dataPeserta2.name:cur.name;
+   const nama2=pasanganId?(dataPasangan?dataPasangan.name:''):(dataPeserta2?dataPeserta2.name:'');
+   const namaGabungan=paketSemi&&dataPasangan?dataPeserta1.name+' & '+nama2:cur.name;
    const amtBaru=priceFor(pg.id,f.get('city'));
    if(api){
     if(isNew){await apiSaveTransaction({date:iso(TODAY),type:'in',program_id:pg.id,category:pg.name,coach_id:cur.coach,desc:namaGabungan,amount:amtBaru});inc=' Pemasukan program tercatat di Keuangan (satu pembayaran).'}
@@ -114,7 +141,7 @@ FORMS.client=async f=>{
   return cur;
  };
  c=await simpanSatu(c,dataPeserta1,isNew1,true);
- if(paketSemi)dataPasangan=await simpanSatu(dataPasangan,dataPeserta2,isNew2,false);
+ if(paketSemi&&!pasanganId)dataPasangan=await simpanSatu(dataPasangan,dataPeserta2,isNew2,false);
  logAct((id?'memperbarui klien ':'menambah klien ')+c.name+(paketSemi?' dan '+dataPasangan.name+' (paket 2 peserta)':''));
  appState.modal=null;toast((paketSemi?'Paket 2 peserta disimpan: dua dashboard terpisah, satu pembayaran.':'Klien disimpan dan tersinkron.')+moved+lepas+inc);render()};
 function invoiceCanvas(d){
