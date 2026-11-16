@@ -7,7 +7,7 @@ import { TODAY, addD, dIdx, esc, first, fmtD, hhmm, iso, parseDate } from '../co
 import { icon } from '../core/icons.js';
 import { ACT, FORMS, MODALS, PAGES } from '../core/registry.js';
 import { ATT_MIN, attOpen, attOpenAt, locOf, sessionsOn } from '../core/shared.js';
-import { appState, findClientById, findProgramById, getClientEndDate, getMemberName, isSemi, store } from '../core/store.js';
+import { appState, findClientById, findProgramById, getClientEndDate, getMemberName, isSemi, pairLabel, pairMembers, store } from '../core/store.js';
 import { banner, kpi, pill, sheet, tabsBar } from '../ui/components.js';
 import { render, toast } from '../ui/shell.js';
 
@@ -34,14 +34,31 @@ function attList(){
     return{t:b.time,n:c.name,ket:tp?'dialihkan ke '+getMemberName(tp.to)+' (titip)':mk?'diundur — sesi pengganti '+fmtD(parseDate(mk.date))+' pukul '+mk.time:'diundur — sesi pengganti di ekor program'}})
    .sort((a,z)=>a.t<z.t?-1:1)};
  const jejakHtml=co=>{const j=jejak(co);return j.length?`<div class="listv"><p class="sub" style="margin:0">Cuti disetujui pada tanggal ini — sesi berikut tidak berlangsung di sini:</p>${j.map(x=>`<div class="li"><div><b>${x.t} · ${esc(x.n)}</b><small>${esc(x.ket)}</small></div></div>`).join('')}</div>`:''};
+ /* Tampilan 1 kesatuan (Fase 3): dua anggota pasangan semi privat dalam
+    satu slot ditampilkan sebagai satu entri "A & B" berlabel
+    "Pasangan semi privat", bukan dua baris terpisah. */
+ const dispNames=names=>{
+  const out=[],used=new Set();
+  for(const e of names){
+   if(used.has(e.cid))continue;
+   const c=findClientById(e.cid),ms=c?pairMembers(c):null;
+   const other=ms?names.find(x=>x.cid===(ms[0].id===c.id?ms[1].id:ms[0].id)):null;
+   if(ms&&other){
+    used.add(e.cid);used.add(other.cid);
+    out.push({n:pairLabel(ms)+' ('+((findProgramById(ms[0].pid)||{}).name||'-')+')',tag:'Pasangan semi privat',cid:ms[0].id});
+    continue}
+   used.add(e.cid);out.push(e);
+  }
+  return out};
  const item=x=>{
   const co=x.co,st=x.rec?x.rec.s:null,end=hhmm(attOpenAt(dk,x.t));
+  const dn=dispNames(x.names);
   const btns=[['Hadir','Konfirmasi hadir'],['Tidak hadir','Tidak hadir']].map(([v,l])=>`<button class="btn sm ${st===v?'primary':''}" data-act="cattset" data-d="${dk}" data-co="${co}" data-t="${x.t}" data-s="${v}" ${x.ok?'':'disabled'} aria-pressed="${st===v}">${l}</button>`).join('');
   const info=st?pill(st==='Hadir'?'Hadir':'Tidak hadir',st==='Hadir'?'good':'bad'):(x.ok?pill('Menunggu konfirmasi','warn'):pill('Terkunci sampai '+end,'info'));
   const tags=x.names.filter(e=>e.tag).map(e=>esc(e.n.slice(0,e.n.lastIndexOf(' (')))+' — '+esc(e.tag)).join(' · ');
   const body=appState.attCompact
-   ?`<div style="flex:1;min-width:200px"><b>${x.t} - ${end} WIB</b><small>${all?esc(first(getMemberName(co)))+' · ':''}${esc(locOf(co))} · ${x.names.map(e=>esc(e.n.slice(0,e.n.lastIndexOf(' (')))).join(', ')}</small>${tags?`<small style="color:var(--warn);font-weight:700">${tags}</small>`:''}</div>`
-   :`<div style="flex:1;min-width:220px"><small style="color:${x.rec?'var(--good)':'var(--warn)'};font-weight:700">${x.rec?esc(getMemberName(co))+', absensi jadwal ini sudah dikonfirmasi.':(isC?esc(getMemberName(co))+', kamu memiliki jadwal absensi yang harus kamu konfirmasi.':esc(getMemberName(co))+' memiliki jadwal absensi yang harus dikonfirmasi.')}</small><b>Jadwal melatih ${x.t} - ${end} WIB</b><small><b>Coach:</b> ${esc(getMemberName(co))}</small><small><b>Lokasi melatih:</b> ${esc(locOf(co))}</small><small><b>Klien yang dilatih:</b> ${x.names.map(e=>esc(e.n)+(e.tag?' · '+esc(e.tag):'')).join('; ')}</small><small><b>Absensi bisa diisi:</b> mulai pukul ${end} (setelah jadwal selesai)</small>${x.rec?`<small><b>Status:</b> ${x.rec.s==='Hadir'?'Coach hadir melatih':'Coach tidak hadir'}, dikonfirmasi oleh ${esc(x.rec.by)} pukul ${x.rec.at}</small>`:''}</div>`;
+   ?`<div style="flex:1;min-width:200px"><b>${x.t} - ${end} WIB</b><small>${all?esc(first(getMemberName(co)))+' · ':''}${esc(locOf(co))} · ${dn.map(e=>esc(e.n.slice(0,e.n.lastIndexOf(' (')))).join(', ')}</small>${tags?`<small style="color:var(--warn);font-weight:700">${tags}</small>`:''}</div>`
+   :`<div style="flex:1;min-width:220px"><small style="color:${x.rec?'var(--good)':'var(--warn)'};font-weight:700">${x.rec?esc(getMemberName(co))+', absensi jadwal ini sudah dikonfirmasi.':(isC?esc(getMemberName(co))+', kamu memiliki jadwal absensi yang harus kamu konfirmasi.':esc(getMemberName(co))+' memiliki jadwal absensi yang harus dikonfirmasi.')}</small><b>Jadwal melatih ${x.t} - ${end} WIB</b><small><b>Coach:</b> ${esc(getMemberName(co))}</small><small><b>Lokasi melatih:</b> ${esc(locOf(co))}</small><small><b>Klien yang dilatih:</b> ${dn.map(e=>esc(e.n)+(e.tag?' · '+esc(e.tag):'')).join('; ')}</small><small><b>Absensi bisa diisi:</b> mulai pukul ${end} (setelah jadwal selesai)</small>${x.rec?`<small><b>Status:</b> ${x.rec.s==='Hadir'?'Coach hadir melatih':'Coach tidak hadir'}, dikonfirmasi oleh ${esc(x.rec.by)} pukul ${x.rec.at}</small>`:''}</div>`;
   /* Kehadiran per peserta (komisi semi privat): bila slot ini berisi pasangan
      semi privat (dua klien, grp sama, program semi), tampilkan tombol
      Hadir/Tidak hadir per peserta di bawah tombol coach. Aktif saat slot

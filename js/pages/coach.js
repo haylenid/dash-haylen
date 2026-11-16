@@ -5,9 +5,9 @@ import { COACHES, PERIODS, ROLE_USER_IDS, SLOTS, periodOf } from '../core/consta
 import { calCell, freeSlots, offList, offOn, offSlot } from '../core/derived.js';
 import { DAYS, DAYSL, TODAY, addD, dIdx, esc, first, fmtD, hhmm, iso, parseDate, slug } from '../core/helpers.js';
 import { icon } from '../core/icons.js';
-import { ACT, FORMS, MODALS, PAGES } from '../core/registry.js';
+import { ACT, CONF, FORMS, MODALS, PAGES } from '../core/registry.js';
 import { SKILLS, coachScore, locOf, skillAvg } from '../core/shared.js';
-import { appState, findClientById, findClientByUid, findProgramById, getClientStatus, getMemberName, store } from '../core/store.js';
+import { appState, findClientById, findClientByUid, findProgramById, getClientStatus, getMemberName, pairLabel, pairMembers, store } from '../core/store.js';
 import { banner, pill, renderSegmented, sheet, tabsBar } from '../ui/components.js';
 import { awaitLogo, logoImg, pagesToPdf } from '../ui/pdf.js';
 import { copyToClipboard, render, toast } from '../ui/shell.js';
@@ -99,18 +99,55 @@ const idPreview=(uid,c)=>{
    + klien yang belum punya coach. Klien coach lain tidak ditampilkan sama sekali (pindah coach
    lewat menu Klien). Arsip & status Selesai disembunyikan. Pilihan wajib dari daftar (cid). */
 const slotClientPool=c=>store.clients.filter(k=>!k.arch&&getClientStatus(k)!=='Selesai'&&(k.coach===c||!COACHES.includes(k.coach)));
+/* Pasangan semi privat yang bookingnya terpisah (satu anggota dijadwalkan,
+   satunya tidak / jamnya beda) — untuk banner peringatan + Satukan.
+   Pasangan yang belum dijadwalkan sama sekali bukan "terpisah". */
+const splitPairs=()=>{
+ const seen=new Set(),out=[];
+ store.clients.forEach(c=>{
+  if(!c.grp||seen.has(c.grp))return;
+  const ms=pairMembers(c);if(!ms)return;seen.add(c.grp);
+  const [a,b]=ms;
+  const key=x=>x.coach+'|'+x.day+'|'+x.time;
+  const sa=new Set(store.book.filter(x=>x.client===a.id).map(key));
+  const sb=new Set(store.book.filter(x=>x.client===b.id).map(key));
+  if(!sa.size&&!sb.size)return;
+  if(sa.size===sb.size&&[...sa].every(k=>sb.has(k)))return;
+  out.push({ms,a,b});
+ });
+ return out};
+const splitDesc=c=>{const bs=store.book.filter(x=>x.client===c.id);
+ return bs.length?bs.map(b=>DAYSL[b.day]+' '+b.time).join(', '):'belum dijadwalkan'};
 const slotPickList=(q,c,d,tt)=>{
  const query=String(q||'').trim().toLowerCase(),pool=slotClientPool(c);
  const bare=s=>String(s||'').toLowerCase().replace(/[\s-]/g,'');
- const match=k=>!query||k.name.toLowerCase().includes(query)||bare(k.uid).includes(bare(query));
+ const matchName=k=>!query||k.name.toLowerCase().includes(query)||bare(k.uid).includes(bare(query));
  const rank=k=>{if(!query)return 2;const nm=k.name.toLowerCase();return nm.startsWith(query)?0:nm.includes(query)?1:2};
- const item=k=>{
-  const inSlot=tt&&!String(tt).startsWith('p:')&&store.book.some(b=>b.coach===c&&b.day===d&&b.time===tt&&b.client===k.id);
+ const inSlot=(cid)=>tt&&!String(tt).startsWith('p:')&&store.book.some(b=>b.coach===c&&b.day===d&&b.time===tt&&b.client===cid);
+ /* Pasangan semi privat = SATU baris ("A & B"); klien solo = satu baris. */
+ const rows=[];const seenGrp=new Set();
+ pool.forEach(k=>{
+  const ms=pairMembers(k);
+  if(ms){
+   if(seenGrp.has(k.grp))return;seenGrp.add(k.grp);
+   if(!matchName(ms[0])&&!matchName(ms[1]))return;
+   rows.push({pair:ms,coach:ms[0].coach,rank:Math.min(rank(ms[0]),rank(ms[1])),name:pairLabel(ms)});return}
+  if(!matchName(k))return;
+  rows.push({pair:null,client:k,coach:k.coach,rank:rank(k),name:k.name});
+ });
+ const item=r=>{
+  if(r.pair){
+   const [a,b]=r.pair,inA=inSlot(a.id),inB=inSlot(b.id);
+   const sub=`<small>${esc(findProgramById(a.pid).name)} · pasangan semi privat${inA&&inB?'':(inA||inB)?' · 1 anggota sudah di sesi ini':''}</small>`;
+   return inA&&inB?`<div class="acitem dis"><span class="acn">${esc(pairLabel(r.pair))}</span>${sub}<em>Sudah di sesi ini</em></div>`
+    :`<button type="button" class="acitem" data-act="acpick" data-id="${a.id}"><span class="acn">${esc(pairLabel(r.pair))}</span>${sub}</button>`;
+  }
+  const k=r.client,inS=inSlot(k.id);
   const sub=`<small>${esc(findProgramById(k.pid).name)} · ${esc(k.uid||'')}</small>`;
-  return inSlot?`<div class="acitem dis"><span class="acn">${esc(k.name)}</span>${sub}<em>Sudah di sesi ini</em></div>`
+  return inS?`<div class="acitem dis"><span class="acn">${esc(k.name)}</span>${sub}<em>Sudah di sesi ini</em></div>`
    :`<button type="button" class="acitem" data-act="acpick" data-id="${k.id}"><span class="acn">${esc(k.name)}</span>${sub}</button>`};
- const own=pool.filter(k=>k.coach===c&&match(k)).sort((a,b)=>rank(a)-rank(b)||a.name.localeCompare(b.name));
- const free=pool.filter(k=>k.coach!==c&&match(k)).sort((a,b)=>rank(a)-rank(b)||a.name.localeCompare(b.name));
+ const own=rows.filter(r=>r.coach===c).sort((a,b)=>a.rank-b.rank||a.name.localeCompare(b.name));
+ const free=rows.filter(r=>r.coach!==c).sort((a,b)=>a.rank-b.rank||a.name.localeCompare(b.name));
  const total=own.length+free.length;
  if(!total)return '<p class="sub" style="margin:6px 2px">Tidak ada klien yang cocok. Klien coach lain tidak ditampilkan — pindah coach dilakukan lewat menu Klien.</p>';
  /* Tanpa potong: semua hasil dirender, wadah .aclist yang menggulir (tinggi ±5,5 baris).
@@ -121,6 +158,12 @@ const slotPickList=(q,c,d,tt)=>{
 const slotPreview=(cid,c)=>{
  const k=cid?findClientById(cid):null;
  if(!k)return '<p class="sub">Pilih klien dari daftar — nama, paket, dan lokasi tampil di sini.</p>';
+ const ms=pairMembers(k);
+ if(ms){
+  const note=!COACHES.includes(ms[0].coach)?`<p class="sub" style="color:var(--warn)">Pasangan ini belum punya coach. Menyimpan akan menugaskan keduanya ke ${esc(getMemberName(c))}.</p>`
+   :ms[0].coach!==c?`<p class="sub" style="color:var(--warn)">Pasangan ini milik ${esc(getMemberName(ms[0].coach))}. Menyimpan akan memindahkan keduanya ke ${esc(getMemberName(c))}.</p>`:'';
+  return `<div class="idcard"><b>${esc(pairLabel(ms))}</b><small class="mono">${esc(ms.map(x=>x.uid||'').join(' · '))}</small><small>${esc(findProgramById(ms[0].pid).name)} · pasangan semi privat (2 peserta)</small><small>Lokasi: ${esc(locOf(c))}</small></div>${note}`;
+ }
  const note=!COACHES.includes(k.coach)?`<p class="sub" style="color:var(--warn)">Klien ini belum punya coach. Menyimpan akan menugaskannya ke ${esc(getMemberName(c))}.</p>`
   :k.coach!==c?`<p class="sub" style="color:var(--warn)">Klien ini milik ${esc(getMemberName(k.coach))}. Menyimpan akan memindahkannya ke ${esc(getMemberName(c))}.</p>`:'';
  return `<div class="idcard"><b>${esc(k.name)}</b><small class="mono">${esc(k.uid||'')}</small><small>${esc(findProgramById(k.pid).name)}</small><small>Lokasi: ${esc(locOf(c))}</small></div>${note}`};
@@ -152,7 +195,24 @@ PAGES.coach=()=>{
      if(inChip)return inChip;
      if(offD)return `<span class="tc fr"><span>${t}</span><em>Cuti</em></span>`;
      return `<button class="tc fr" data-act="modal" data-v="slot" data-id="${cc}|${di}|${t}"><span>${t}</span><em>Kosong</em></button>`}
-    return bs.map(b=>{const cli=findClientById(b.client);const tp=(store.titip||[]).find(x=>x.date===kDate&&x.from===cc&&x.client===b.client&&x.time===t);return `<button class="tc bk" data-act="modal" data-v="slot" data-id="${cc}|${di}|${t}|${b.client}" title="${esc(cli.name)}${b.hold?' (komisi ditahan)':''}"><span>${t}</span><b>${esc(first(cli.name))}</b>${tp?`<i>dititipkan ke ${esc(first(getMemberName(tp.to)))}</i>`:offD?'<i>diundur</i>':(cli.end_orig&&kDate>cli.end_orig)?'<i>sesi pengganti</i>':''}${b.hold?'<i>ditahan</i>':''}</button>`}).join('')+`<button class="tc add" data-act="modal" data-v="slot" data-id="${cc}|${di}|${t}" title="Tambah klien lain di jam ${t}" aria-label="Gabung klien lain jam ${t}">+</button>`+inChip}).join('');
+    /* Pasangan semi privat = SATU chip ("A & B" + label pasangan semi
+       privat), bukan dua chip yang sama-sama bertuliskan kata pertama nama. */
+    const seenChip=new Set(),chipHtml=[];
+    bs.forEach(b=>{
+     if(seenChip.has(b.client))return;
+     const cli=findClientById(b.client);if(!cli)return;
+     const ms=pairMembers(cli);
+     const otherId=ms?(ms[0].id===cli.id?ms[1].id:ms[0].id):null;
+     const partnerHere=ms&&bs.some(x=>x.client===otherId);
+     if(ms&&partnerHere){
+      const prim=ms[0];seenChip.add(ms[0].id);seenChip.add(ms[1].id);
+      const tp=(store.titip||[]).find(x=>x.date===kDate&&x.from===cc&&x.client===prim.id&&x.time===t);
+      const holdB=bs.some(x=>x.hold&&(x.client===ms[0].id||x.client===ms[1].id));
+      chipHtml.push(`<button class="tc bk" data-act="modal" data-v="slot" data-id="${cc}|${di}|${t}|${prim.id}" title="${esc(pairLabel(ms))} (pasangan semi privat)${holdB?' (komisi ditahan)':''}"><span>${t}</span><b>${esc(pairLabel(ms))}</b><i>pasangan semi privat</i>${tp?`<i>dititipkan ke ${esc(first(getMemberName(tp.to)))}</i>`:offD?'<i>diundur</i>':(prim.end_orig&&kDate>prim.end_orig)?'<i>sesi pengganti</i>':''}${holdB?'<i>ditahan</i>':''}</button>`);return}
+     seenChip.add(b.client);
+     const tp=(store.titip||[]).find(x=>x.date===kDate&&x.from===cc&&x.client===b.client&&x.time===t);
+     chipHtml.push(`<button class="tc bk" data-act="modal" data-v="slot" data-id="${cc}|${di}|${t}|${b.client}" title="${esc(cli.name)}${b.hold?' (komisi ditahan)':''}"><span>${t}</span><b>${esc(first(cli.name))}</b>${tp?`<i>dititipkan ke ${esc(first(getMemberName(tp.to)))}</i>`:offD?'<i>diundur</i>':(cli.end_orig&&kDate>cli.end_orig)?'<i>sesi pengganti</i>':''}${b.hold?'<i>ditahan</i>':''}</button>`)});
+    return chipHtml.join('')+`<button class="tc add" data-act="modal" data-v="slot" data-id="${cc}|${di}|${t}" title="Tambah klien lain di jam ${t}" aria-label="Gabung klien lain jam ${t}">+</button>`+inChip}).join('');
    return `<div class="tcs">${chips}<button class="tc add" data-act="modal" data-v="slot" data-id="${cc}|${di}|p:${p}" aria-label="Tambah sesi ${p} ${esc(getMemberName(cc))}">+ Jam</button></div>`};
   const rowsT=list.map(cc=>{const bkd=store.book.filter(b=>b.coach===cc&&b.day===di).length,free=Math.max(0,((store.pattern[cc]||[])[di]||[]).filter(s=>!store.book.some(b=>b.coach===cc&&b.day===di&&b.time===s)).length);
    return `<tr><td class="cn"><b>${esc(getMemberName(cc))}</b><small>${esc(locOf(cc))}</small><small>${bkd} terisi · ${free} kosong</small>${offOn(cc,kDate)?`<small style="color:var(--bad)">Cuti pada tanggal ini</small>`:''}</td>${PERIODS.map(p=>`<td>${cellOf(cc,p)}</td>`).join('')}</tr>`}).join('');
@@ -165,7 +225,9 @@ PAGES.coach=()=>{
   <div class="toolbar">${coachPicker('sched')}<label class="field" style="max-width:200px"><span>Mulai tanggal</span><input type="date" id="f-sfrom" data-f="shareFrom" min="${iso(TODAY)}" value="${appState.shareFrom}"></label><label class="field" style="max-width:180px"><span>Rentang</span><select data-f="shareDays" data-n>${[7,14,30].map(n=>`<option value="${n}" ${appState.shareDays===n?'selected':''}>${n} hari</option>`).join('')}</select></label><span class="sp"></span><button class="btn" data-act="dljpg">${icon('download',15)} Unduh JPG</button><button class="btn primary" data-act="dlshare">${icon('download',15)} Unduh PDF</button></div>
   </section>`;
   const kal=`<div class="toolbar">${coachPicker('sched')}</div><section class="card"><header class="ch"><h3>Kalender 30 hari ${esc(first(getMemberName(c)))}</h3><span class="sub">Hijau: ada slot kosong. Merah: cuti atau tidak bisa mengajar. Kuning: pengajuan menunggu persetujuan. Ketuk tanggal untuk membukanya di Pola mingguan.</span></header><div class="cal">${DAYS.map(d=>`<div class="h7">${d}</div>`).join('')}${cells.join('')}</div>${offList(c)}</section>`;
-  body=[pola,share,kal][t];
+  const split=splitPairs();
+  const splitHtml=!split.length||t!==0?'':`<section class="card" style="border-color:var(--warn)"><header class="ch"><h3>Pasangan semi privat terpisah</h3><span class="sub">Booking pasangan berikut tidak sama — satukan agar jadwal dan absensi kembali 1 kesatuan.</span></header><div class="listv">${split.map(s=>`<div class="li"><div><b>${esc(pairLabel(s.ms))}</b><small>${esc(s.a.name)}: ${esc(splitDesc(s.a))} · ${esc(s.b.name)}: ${esc(splitDesc(s.b))}</small></div><div class="acts"><button class="btn sm primary" data-act="pairsatukan" data-v="${s.ms[0].id}">Satukan</button></div></div>`).join('')}</div></section>`;
+  body=[splitHtml+pola,share,kal][t];
  }
  if(t===3){
   body=`<div class="toolbar"><h3 style="font-size:16px">Daftar coach</h3><span class="sp"></span><span class="sub">Coach baru ditambahkan lewat menu Anggota.</span></div>
@@ -187,7 +249,17 @@ MODALS.slot=m=>{
   return `<label class="field"><span>Jam sesi</span><select name="tsel" data-tsel>${SLOTS.map(s=>`<option value="${s}" ${!isC&&s===sel?'selected':''} ${''}>${s} · ${periodOf(s)}${cnt(s)?' ('+cnt(s)+' klien)':''}</option>`).join('')}<option value="custom" ${isC?'selected':''}>Jam manual (custom)</option></select></label><label class="field" id="ctw" ${isC?'':'hidden'}><span>Jam manual</span><input type="time" name="ctime" id="f-ctime" step="300" value="${isC&&sel!=='custom'?sel:''}"></label>`};
  const hold=on=>`<label class="chk"><input type="checkbox" name="hold" ${on?'checked':''}><span><b>Ada perubahan jadwal: tahan komisi</b><small>Bila dicentang, komisi sesi ini tidak otomatis masuk ke dashboard coach sampai Anda melepas centang.</small></span></label>`;
  const hid=`<input type="hidden" name="c" value="${c}"><input type="hidden" name="d" value="${d}"><input type="hidden" name="id" value="${m.id}">`;
- if(b&&cli)return sheet('Sesi terisi',head+`<div class="idcard"><b>${esc(cli.name)}</b><small class="mono">${esc(cli.uid)}</small><small>${esc(findProgramById(cli.pid).name)}</small><small>Lokasi: ${esc(locOf(c))}</small>${mates.length?`<small>Satu sesi dengan: ${esc(mates.map(x=>findClientById(x.client).name).join(', '))}</small>`:''}</div><form data-form="slotsave" class="listv" style="margin-top:12px">${hid}<div class="fg">${timeSel(b.time)}</div>${hold(b.hold)}<div class="row"><button class="btn primary" type="submit">Simpan</button><button class="btn danger" type="button" data-act="slotdel" data-id="${m.id}">Keluarkan dari sesi</button><button class="btn" type="button" data-act="close">Tutup</button></div></form>`);
+ if(b&&cli){
+  /* Pasangan semi privat = 1 kesatuan: kartu menampilkan "A & B" +
+     label pasangan; pasangannya sendiri bukan lagi "Satu sesi dengan". */
+  const ms=pairMembers(cli);
+  const otherId=ms?(ms[0].id===cli.id?ms[1].id:ms[0].id):null;
+  const pairHere=ms&&store.book.some(x=>x.coach===c&&x.day===d&&x.time===tt&&x.client===otherId);
+  const matesShown=mates.filter(x=>!(pairHere&&x.client===otherId));
+  const card=pairHere
+   ?`<div class="idcard"><b>${esc(pairLabel(ms))}</b><small class="mono">${esc(ms.map(x=>x.uid||'').join(' · '))}</small><small>${esc(findProgramById(cli.pid).name)} · pasangan semi privat (2 peserta)</small><small>Lokasi: ${esc(locOf(c))}</small>${matesShown.length?`<small>Satu sesi dengan: ${esc(matesShown.map(x=>findClientById(x.client).name).join(', '))}</small>`:''}</div>`
+   :`<div class="idcard"><b>${esc(cli.name)}</b><small class="mono">${esc(cli.uid)}</small><small>${esc(findProgramById(cli.pid).name)}</small><small>Lokasi: ${esc(locOf(c))}</small>${mates.length?`<small>Satu sesi dengan: ${esc(mates.map(x=>findClientById(x.client).name).join(', '))}</small>`:''}</div>`;
+  return sheet('Sesi terisi',head+card+`<form data-form="slotsave" class="listv" style="margin-top:12px">${hid}<div class="fg">${timeSel(b.time)}</div>${hold(b.hold)}<div class="row"><button class="btn primary" type="submit">Simpan</button><button class="btn danger" type="button" data-act="slotdel" data-id="${m.id}">${pairHere?'Keluarkan pasangan dari sesi':'Keluarkan dari sesi'}</button><button class="btn" type="button" data-act="close">Tutup</button></div></form>`)}
  return sheet('Isi sesi dengan klien',head+`<form data-form="slotadd" class="listv">${hid}<label class="field full"><span>Nama klien</span><input id="f-slotname" name="q" data-acl data-coach="${c}" data-day="${d}" data-time="${tt}" autocomplete="off" placeholder="Ketik nama atau ID klien, lalu pilih dari daftar"></label><input type="hidden" name="cid" id="f-slotcid" value=""><div id="aclist" class="aclist">${slotPickList('',c,d,tt)}</div>${!isAdd&&store.book.some(x=>x.coach===c&&x.day===d&&x.time===tt)?`<p class="sub" style="margin:0">Jam ${tt} sudah berisi ${esc(store.book.filter(x=>x.coach===c&&x.day===d&&x.time===tt).map(x=>first(findClientById(x.client).name)).join(', '))}. Klien baru akan bergabung di sesi yang sama.</p>`:''}<div id="idprev" class="idprev">${slotPreview('',c)}</div><div class="fg">${timeSel(isAdd?'':tt)}</div>${hold(false)}<div class="row"><button class="btn primary" type="submit">Simpan ke jadwal</button>${preset&&!isAdd?(open?`<button class="btn" type="button" data-act="slotclose" data-id="${m.id}">Tutup slot</button>`:`<button class="btn" type="button" data-act="slotopen" data-id="${m.id}">Buka sebagai slot kosong</button>`):''}<button class="btn" type="button" data-act="close">Batal</button></div></form>`);
 };
 const pickTime=f=>{const idp=String(f.get('id')||'').split('|'),ts=f.get('tsel')||idp[2]||'',t=ts==='custom'?(f.get('ctime')||''):ts;return /^\d\d:\d\d$/.test(t)?t:''};
@@ -195,26 +267,64 @@ FORMS.slotadd=async f=>{
  const idp=String(f.get('id')||'').split('|'),c=f.get('c')||idp[0],d=+(f.get('d')??idp[1]),sl=pickTime(f),k=findClientById(f.get('cid'));
  if(!k||k.arch){toast('Pilih klien dari daftar saran terlebih dahulu');return}
  if(!sl){toast('Pilih jam sesi atau isi jam manual');return}
- if(store.book.some(b=>b.coach===c&&b.day===d&&b.time===sl&&b.client===k.id)){toast(first(k.name)+' sudah ada di jam '+sl);return}
- if(k.coach!==c){store.book=store.book.filter(b=>b.client!==k.id);k.coach=c}
+ /* Pasangan semi privat = 1 kesatuan: keduanya masuk ke slot yang sama
+    dalam satu aksi. Bila satu anggota sudah di slot ini, tambahkan yang
+    belum ada saja. */
+ const ms=pairMembers(k),targets=ms||[k];
+ const label=ms?pairLabel(ms):k.name;
+ const todo=targets.filter(x=>!store.book.some(b=>b.coach===c&&b.day===d&&b.time===sl&&b.client===x.id));
+ if(!todo.length){toast(first(label)+' sudah ada di jam '+sl);return}
+ todo.forEach(x=>{if(x.coach!==c){store.book=store.book.filter(b=>b.client!==x.id);x.coach=c}});
  if(SLOTS.includes(sl)&&!(store.pattern[c][d]||[]).includes(sl)){
    store.pattern[c]=store.pattern[c].slice();
    store.pattern[c][d]=[...store.pattern[c][d],sl].sort();
    if(isApiMode()){try{await apiSavePattern(c,d,store.pattern[c][d])}catch(e){console.error('Gagal simpan pola:',e)}}
  }
- const rec={coach:c,client:k.id,day:d,time:sl};if(f.get('hold'))rec.hold=true;
  if(isApiMode()){
-   try{await apiAddBooking(rec)}catch(e){console.error('Gagal simpan booking:',e);store.book.push(rec)}
- }else{store.book.push(rec)}
- logAct('mengisi jadwal '+first(getMemberName(c))+' '+DAYSL[d]+' '+sl+' dengan '+k.name);appState.modal=null;toast(first(k.name)+' masuk ke '+DAYSL[d]+' '+sl+'. Komisi otomatis saat sesi selesai.');render()};
-FORMS.slotsave=f=>{
+   const added=[];
+   for(const x of todo){
+     const rec={coach:c,client:x.id,day:d,time:sl};if(f.get('hold'))rec.hold=true;
+     try{added.push(await apiAddBooking(rec))}catch(e){
+       console.error('Gagal simpan booking:',e);
+       /* Rollback: pasangan harus masuk bersama atau tidak sama sekali. */
+       for(const ab of added){try{await apiDel('/bookings/'+ab.id)}catch(_){}}
+       store.book=store.book.filter(b=>!added.some(ab=>ab.id===b.id));
+       toast('Gagal menyimpan jadwal '+(ms?'pasangan':'')+': '+(e.message||e));return}
+   }
+ }else{
+   todo.forEach(x=>{const rec={coach:c,client:x.id,day:d,time:sl};if(f.get('hold'))rec.hold=true;store.book.push(rec)});
+ }
+ logAct('mengisi jadwal '+first(getMemberName(c))+' '+DAYSL[d]+' '+sl+' dengan '+label);appState.modal=null;toast(first(label)+' masuk ke '+DAYSL[d]+' '+sl+'. Komisi otomatis saat sesi selesai.');render()};
+FORMS.slotsave=async f=>{
  const idp=String(f.get('id')||'').split('|'),c=f.get('c')||idp[0],d=+(f.get('d')??idp[1]),b=store.book.find(x=>x.coach===c&&x.day===d&&x.time===idp[2]&&x.client===idp[3]);
  if(!b){appState.modal=null;render();return}
  const nt=pickTime(f)||b.time;
- if(nt!==b.time&&store.book.some(x=>x.coach===c&&x.day===d&&x.time===nt&&x.client===b.client)){toast('Klien sudah ada di jam '+nt);return}
- if(nt!==b.time&&SLOTS.includes(nt)&&!(store.pattern[c][d]||[]).includes(nt)){store.pattern[c]=store.pattern[c].slice();store.pattern[c][d]=[...store.pattern[c][d],nt].sort()}
- const moved=nt!==b.time;b.time=nt;if(f.get('hold'))b.hold=true;else delete b.hold;
- logAct((moved?'memindah jam sesi ':'memperbarui sesi ')+findClientById(b.client).name+(b.hold?' (komisi ditahan)':''));appState.modal=null;toast(b.hold?'Komisi sesi ditahan':moved?'Jam sesi diubah ke '+nt:'Perubahan disimpan');render()};
+ const cli=findClientById(b.client),ms=pairMembers(cli);
+ const otherId=ms?(ms[0].id===cli.id?ms[1].id:ms[0].id):null;
+ const partnerB=ms?store.book.find(x=>x.coach===c&&x.day===d&&x.time===idp[2]&&x.client===otherId):null;
+ const targets=partnerB?[b,partnerB]:[b];
+ const label=partnerB?pairLabel(ms):cli.name;
+ if(nt!==b.time&&targets.some(x=>store.book.some(y=>y.coach===c&&y.day===d&&y.time===nt&&y.client===x.client))){toast('Klien sudah ada di jam '+nt);return}
+ if(nt!==b.time&&SLOTS.includes(nt)&&!(store.pattern[c][d]||[]).includes(nt)){store.pattern[c]=store.pattern[c].slice();store.pattern[c][d]=[...store.pattern[c][d],nt].sort();if(isApiMode()){try{await apiSavePattern(c,d,store.pattern[c][d])}catch(e){console.error('Gagal simpan pola:',e)}}}
+ const moved=nt!==b.time,holdV=!!f.get('hold');
+ if(moved&&isApiMode()){
+  /* Pindah jam HARUS tersimpan di server: sebelumnya slotsave hanya
+     mengubah store lokal, sehingga pindahan kembali seperti semula
+     setelah muat ulang. Hapus lalu buat ulang (tidak ada PUT /bookings). */
+  const olds=targets.map(x=>({...x}));
+  try{
+   for(const x of targets){if(x.id)await apiDel('/bookings/'+x.id)}
+   store.book=store.book.filter(x=>!targets.includes(x));
+   for(const x of olds){const nb=await apiAddBooking({coach:c,client:x.client,day:d,time:nt});if(x.hold||holdV)nb.hold=true}
+  }catch(e){
+   console.error('Gagal memindah sesi:',e);
+   /* Kembalikan booking lama sebisa mungkin, lalu beri tahu owner. */
+   for(const x of olds){if(!store.book.some(y=>y.client===x.client&&y.coach===c&&y.day===d&&y.time===x.time)){try{await apiAddBooking({coach:c,client:x.client,day:d,time:x.time})}catch(_){}}}
+   toast('Gagal memindah sesi: '+(e.message||e));render();return}
+ }else{
+  targets.forEach(x=>{x.time=nt;if(holdV)x.hold=true;else delete x.hold});
+ }
+ logAct((moved?'memindah jam sesi ':'memperbarui sesi ')+label+(holdV?' (komisi ditahan)':''));appState.modal=null;toast(holdV?'Komisi sesi ditahan':moved?'Jam sesi diubah ke '+nt:'Perubahan disimpan');render()};
 Object.assign(ACT,{
  pday:t=>{const v=t.dataset.v;appState.cdate=v;appState.pday=dIdx(parseDate(v));if(v<=iso(TODAY))appState.adate=v;render()},
  pweek:t=>{const n=+t.dataset.v,v=n===0?iso(TODAY):iso(addD(parseDate(appState.cdate||iso(TODAY)),n));appState.cdate=v;appState.pday=dIdx(parseDate(v));if(v<=iso(TODAY))appState.adate=v;render()},
@@ -223,19 +333,42 @@ Object.assign(ACT,{
  slotclose:t=>{const[c,ds,sl]=t.dataset.id.split('|'),d=+ds;store.pattern[c]=store.pattern[c].slice();store.pattern[c][d]=store.pattern[c][d].filter(x=>x!==sl);logAct('menutup slot '+DAYSL[d]+' '+sl);appState.modal=null;render()},
  slotdel:async t=>{
   const[c,ds,sl,cid]=t.dataset.id.split('|'),b=store.book.find(x=>x.coach===c&&x.day===+ds&&x.time===sl&&x.client===cid);
-  if(b){
-    logAct('mengosongkan slot '+DAYSL[+ds]+' '+sl+' ('+findClientById(b.client).name+')');
-    if(isApiMode()&&b.id){try{await apiDel('/bookings/'+b.id)}catch(e){console.error('Gagal hapus booking:',e);toast('Gagal menghapus: '+(e.message||e));return}}
-    store.book=store.book.filter(x=>x!==b)
-  }
+  if(!b){appState.modal=null;render();return}
+  const cli=findClientById(b.client),ms=pairMembers(cli);
+  const otherId=ms?(ms[0].id===cli.id?ms[1].id:ms[0].id):null;
+  const partnerB=ms?store.book.find(x=>x.coach===c&&x.day===+ds&&x.time===sl&&x.client===otherId):null;
+  if(partnerB){
+   /* Pasangan = 1 kesatuan: keluarkan keduanya, dengan konfirmasi yang
+      menyebut kedua nama. */
+   appState.modal={k:'confirm',text:'Keluarkan pasangan '+pairLabel(ms)+' dari sesi '+DAYSL[+ds]+' '+sl+'? Keduanya dikeluarkan bersama.',yes:'delslotpair',arg:t.dataset.id,label:'Keluarkan pasangan'};render();return}
+  logAct('mengosongkan slot '+DAYSL[+ds]+' '+sl+' ('+cli.name+')');
+  if(isApiMode()&&b.id){try{await apiDel('/bookings/'+b.id)}catch(e){console.error('Gagal hapus booking:',e);toast('Gagal menghapus: '+(e.message||e));return}}
+  store.book=store.book.filter(x=>x!==b);
   appState.modal=null;toast('Klien dikeluarkan dari sesi');render()},
  acpick:t=>{
   const k=findClientById(t.dataset.id);if(!k)return;
   const inp=document.getElementById('f-slotname'),hid=document.getElementById('f-slotcid'),p=document.getElementById('idprev'),l=document.getElementById('aclist');
-  if(inp)inp.value=k.name;if(hid)hid.value=k.id;
-  if(p)p.innerHTML=slotPreview(k.id,inp?inp.dataset.coach:'');
+  const ms=pairMembers(k);
+  if(inp)inp.value=ms?pairLabel(ms):k.name;if(hid)hid.value=ms?ms[0].id:k.id;
+  if(p)p.innerHTML=slotPreview(ms?ms[0].id:k.id,inp?inp.dataset.coach:'');
   if(l)l.innerHTML='';if(inp)inp.focus()},
 });
+/* Konfirmasi hapus pasangan dari satu slot: keluarkan keduanya bersama. */
+CONF.delslotpair=async id=>{
+ const[c,ds,sl,cid]=String(id||'').split('|'),d=+ds;
+ const b=store.book.find(x=>x.coach===c&&x.day===d&&x.time===sl&&x.client===cid);
+ if(!b){appState.modal=null;render();return}
+ const cli=findClientById(b.client),ms=pairMembers(cli);
+ const otherId=ms?(ms[0].id===cli.id?ms[1].id:ms[0].id):null;
+ const partnerB=ms?store.book.find(x=>x.coach===c&&x.day===d&&x.time===sl&&x.client===otherId):null;
+ const targets=partnerB?[b,partnerB]:[b];
+ const label=partnerB?pairLabel(ms):cli.name;
+ if(isApiMode()){
+  for(const x of targets){if(x.id){try{await apiDel('/bookings/'+x.id)}catch(e){console.error('Gagal hapus booking:',e);toast('Gagal menghapus: '+(e.message||e));render();return}}}
+ }
+ store.book=store.book.filter(x=>!targets.includes(x));
+ logAct('mengosongkan slot '+DAYSL[d]+' '+sl+' ('+label+')');
+ appState.modal=null;toast('Pasangan '+label+' dikeluarkan dari sesi');render()};
 Object.assign(ACT,{
  copyuid:t=>copyToClipboard(t.dataset.v,'ID klien '+t.dataset.v+' tersalin'),
  copysw:t=>copyToClipboard(t.dataset.v,'Link smartwatch tersalin'),
@@ -245,7 +378,26 @@ Object.assign(ACT,{
   logAct('memperbarui pola mingguan '+first(getMemberName(c)));render()},
   dlshare:async()=>{try{try{await Promise.all(['500','600','700','800'].map(w=>document.fonts.load(w+' 20px Montserrat')))}catch(e){}await awaitLogo();const c=myCoach('sched'),cv=shareCanvas(c,parseDate(appState.shareFrom),appState.shareDays),a=document.createElement('a');a.href=URL.createObjectURL(pagesToPdf([cv]));a.download='jadwal-'+slug(getMemberName(c))+'-'+appState.shareFrom+'.pdf';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000);logAct('mengunduh PDF jadwal kosong '+getMemberName(c));toast('Jadwal diunduh sebagai PDF')}catch(e){console.error(e);toast('Gagal membuat PDF')}},
   dljpg:async()=>{try{try{await Promise.all(['500','600','700','800'].map(w=>document.fonts.load(w+' 20px Montserrat')))}catch(e){}await awaitLogo();const c=myCoach('sched'),cv=shareCanvas(c,parseDate(appState.shareFrom),appState.shareDays),a=document.createElement('a');a.href=cv.toDataURL('image/jpeg',.92);a.download='jadwal-'+slug(getMemberName(c))+'-'+appState.shareFrom+'.jpg';document.body.appendChild(a);a.click();a.remove();logAct('mengunduh jadwal kosong '+getMemberName(c));toast('Jadwal diunduh sebagai JPG')}catch(e){toast('Gagal membuat gambar')}},
- seesched:t=>{appState.sched=t.dataset.v;appState.tab=0;render(false)}
+ seesched:t=>{appState.sched=t.dataset.v;appState.tab=0;render(false)},
+ /* Satukan pasangan yang bookingnya terpisah: jadwal anggota ke-2 dibuat
+    sama persis dengan anggota ke-1 (coach + hari + jam). */
+ pairsatukan:async t=>{
+  const prim=findClientById(t.dataset.v);if(!prim)return;
+  const ms=pairMembers(prim);if(!ms)return;
+  const [a,b]=ms;
+  const want=store.book.filter(x=>x.client===a.id).map(x=>({coach:x.coach,day:x.day,time:x.time}));
+  const haveB=store.book.filter(x=>x.client===b.id);
+  if(isApiMode()){
+   try{
+    for(const x of haveB){if(x.id)await apiDel('/bookings/'+x.id)}
+    store.book=store.book.filter(x=>x.client!==b.id);
+    for(const w of want){await apiAddBooking({coach:w.coach,client:b.id,day:w.day,time:w.time})}
+   }catch(e){console.error('Gagal menyatukan pasangan:',e);toast('Gagal menyatukan: '+(e.message||e));render();return}
+  }else{
+   store.book=store.book.filter(x=>x.client!==b.id);
+   want.forEach(w=>store.book.push({coach:w.coach,client:b.id,day:w.day,time:w.time}));
+  }
+  logAct('menyatukan jadwal pasangan '+pairLabel(ms));toast('Jadwal pasangan '+pairLabel(ms)+' sudah disatukan.');render()}
 });
 
 export { coachPicker, idPreview, initCoach, myCoach, pickTime, shareCanvas, slotPickList, slotPreview };

@@ -50,6 +50,16 @@ const getMemberName=id=>store.members.find(m=>m.id===id)?.name||'-';
 /* paket semi privat: program dengan peserta:2 (atau nama mengandung "semi privat"/"paket berdua") */
 const isSemi=p=>!!p&&(+p.peserta===2||/semi[\s-]*priv|paket\s*(berdua|2)/i.test(p.name||''));
 const partnerOf=c=>c&&c.grp?store.clients.find(x=>x.grp===c.grp&&x.id!==c.id)||null:null;
+/* Pasangan semi privat sebagai 1 kesatuan (Fase 3): dua klien satu grp,
+   program semi, keduanya aktif. Urutan: peserta 1 = reg lebih dulu. */
+const pairMembers=c=>{
+ if(!c||!c.grp)return null;
+ const p=partnerOf(c);if(!p)return null;
+ if(!isSemi(findProgramById(c.pid))||!isSemi(findProgramById(p.pid)))return null;
+ if(c.arch||p.arch||getClientStatus(c)==='Selesai'||getClientStatus(p)==='Selesai')return null;
+ return [c,p].sort((a,b)=>(a.reg||0)-(b.reg||0)||(a.id<b.id?-1:1));
+};
+const pairLabel=ms=>ms.map(x=>x.name).join(' & ');
 const uniqClientId=()=>{let id;do{id='cl'+(store.clients.length+1+Math.floor(Math.random()*9000))}while(store.clients.some(x=>x.id===id));return id};
 /* catatan awal klien contoh */
 const SEED_NOTES={'Reza Fahlevi':'Sering terlambat setor laporan. Perlu diingatkan lewat pesan.','Bagas Santoso':'Cedera ringan betis kanan. Kurangi intensitas sampai pulih.','Yoga Permana':'Target half marathon. Pace belum stabil, fokus easy run.','Citra Lestari':'Istirahat sementara, lanjut setelah urusan keluarga selesai.','Putri Maharani':'Berminat perpanjang program bulan depan.','Nadia Salsabila':'Berminat perpanjang program bulan depan.'};
@@ -162,4 +172,4 @@ store.types=[
  {k:'Long Run',zone:2,day:6,pace:110,share:40}
 ];
 
-export { EXP, SEED_CLIENTS, _rid, _tid, appState, feeFor, fillTemplate, findCityById, findClientById, findClientByUid, findProgramById, getClientEndDate, getClientStatus, getMemberName, isSemi, nextClientUid, partnerOf, priceFor, rateFor, store, uniqClientId };
+export { EXP, SEED_CLIENTS, _rid, _tid, appState, feeFor, fillTemplate, findCityById, findClientById, findClientByUid, findProgramById, getClientEndDate, getClientStatus, getMemberName, isSemi, nextClientUid, pairLabel, pairMembers, partnerOf, priceFor, rateFor, store, uniqClientId };
