@@ -114,7 +114,7 @@ const tActivity = a => ({ ...a, t: D(a.t) });
 async function apiBoot() {
   if (!apiToken) { apiMode = false; return false; }
   try {
-    const [members, programs, clients, tx, reqs, team, bcs, settings, tpl, activity, sched, att, cprof, swl, compay, titip, makeup, cities, rates] = await Promise.all([
+    const [members, programs, clients, tx, reqs, team, bcs, settings, tpl, activity, sched, att, catt, cprof, swl, compay, titip, makeup, cities, rates] = await Promise.all([
       apiGet('/members'),
       apiGet('/programs'),
       apiGet('/clients?status=semua'),
@@ -127,6 +127,7 @@ async function apiBoot() {
       apiGet('/activity'),
       req('GET', '/schedule'),
       apiGet('/attendance').catch(e => { console.error('Gagal load attendance:', e); return { data: [] }; }),
+      apiGet('/client-attendance').catch(e => { console.error('Gagal load client-attendance:', e); return { data: [] }; }),
       apiGet('/coach-profiles').catch(() => ({ data: [] })),
       apiGet('/share-links').catch(() => ({ data: [] })),
       apiGet('/commission-payments').catch(() => []),
@@ -179,6 +180,13 @@ async function apiBoot() {
     // apiGet sudah unwrap .data, jadi att langsung array
     ((Array.isArray(att) ? att : (att && att.data)) || []).forEach(r => {
       store.attSlot[r.date + '|' + r.coach_id + '|' + r.time] = { s: r.status, by: r.by_name, at: r.at };
+    });
+    // Absensi per peserta (paket semi privat) dari backend — reset dulu:
+    // seedAttendance() di shared.js mengisi store.attClient dengan data acak
+    // (demo); di mode API nilainya harus dari server, bukan dari seed.
+    store.attClient = {};
+    ((Array.isArray(catt) ? catt : (catt && catt.data)) || []).forEach(r => {
+      store.attClient[r.date + '|' + r.coach_id + '|' + r.time + '|' + r.client_id] = { s: r.status, by: r.by_name, at: r.at };
     });
     // Masalah 8: rekap absensi harian coach dibangun ulang dari attSlot
     // server (bukan memori sesi peramban) — pil Beranda, Daftar coach, skor,
@@ -240,7 +248,7 @@ async function apiBoot() {
 export { API_BASE, apiBoot, apiDel, apiGet, apiPatch, apiPost, apiPut, isApiMode, hasToken, apiLogin, apiLogout, apiUser,
   apiSaveClient, apiSaveTransaction, apiAddMember, apiSaveProgram, apiSendTeamMessage, apiSendDm,
   apiSendBroadcast, apiSendPortalMessage, apiPortalLoad, apiPortalSaveLink, apiSubmitCorrection, apiLog, apiSavePattern, apiAddBooking,
-  apiSaveAttendance, apiSaveCoachProfile, apiSaveShareLink, apiSaveRequest, apiSaveTemplate,
+  apiSaveAttendance, apiSaveClientAttendance, apiSaveCoachProfile, apiSaveShareLink, apiSaveRequest, apiSaveTemplate,
   apiUpdateTemplate, apiDeleteTemplate,
   apiPayCommission, apiCancelCommission, apiFixShareLink };
 
@@ -282,6 +290,10 @@ async function apiAddBooking(d) {
 // Simpan absensi slot ke backend
 async function apiSaveAttendance(date, coach_id, time, status, by_name, at) {
   await apiPost('/attendance', { date, coach_id, time, status, by_name, at });
+}
+// Simpan absensi per peserta (paket semi privat) ke backend
+async function apiSaveClientAttendance(date, coach_id, time, client_id, status, by_name, at) {
+  await apiPost('/client-attendance', { date, coach_id, time, client_id, status, by_name, at });
 }
 // Simpan profil coach ke backend
 async function apiSaveCoachProfile(coach_id, patch) {

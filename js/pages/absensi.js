@@ -1,13 +1,13 @@
 /* js/pages/absensi.js — diekstrak otomatis dari index.html (fase 4 refactor) */
 import { logAct, meId, meUser, scope } from '../core/access.js';
-import { apiDel, apiPatch, apiPost, apiSaveAttendance, apiSaveClient, apiSaveRequest, isApiMode } from '../core/api.js';
+import { apiDel, apiPatch, apiPost, apiSaveAttendance, apiSaveClient, apiSaveClientAttendance, apiSaveRequest, isApiMode } from '../core/api.js';
 import { COACHES, REQUEST_TYPE_KEYS, REQUEST_TYPE_LABELS, ROLE_USER_IDS } from '../core/constants.js';
 import { liveClients, offOn, offSlot } from '../core/derived.js';
 import { TODAY, addD, dIdx, esc, first, fmtD, hhmm, iso, parseDate } from '../core/helpers.js';
 import { icon } from '../core/icons.js';
 import { ACT, FORMS, MODALS, PAGES } from '../core/registry.js';
 import { ATT_MIN, attOpen, attOpenAt, locOf, sessionsOn } from '../core/shared.js';
-import { appState, findClientById, findProgramById, getClientEndDate, getMemberName, store } from '../core/store.js';
+import { appState, findClientById, findProgramById, getClientEndDate, getMemberName, isSemi, store } from '../core/store.js';
 import { banner, kpi, pill, sheet, tabsBar } from '../ui/components.js';
 import { render, toast } from '../ui/shell.js';
 
@@ -18,7 +18,7 @@ function attList(){
  let dk=appState.adate||iso(TODAY);if(parseDate(dk)>TODAY)dk=iso(TODAY);
  store.attSlot=store.attSlot||{};
  const per=cos.map(co=>{
-  const by={};sessionsOn(co,parseDate(dk)).forEach(r=>{(by[r.time]=by[r.time]||[]).push({n:r.c.name+' ('+((findProgramById(r.c.pid)||{}).name||'-')+')',tag:r.titipFrom?'Titipan dari '+first(getMemberName(r.titipFrom)):r.makeup?'Sesi pengganti':r.pengganti?'Sesi pengganti (undur)':null})});
+  const by={};sessionsOn(co,parseDate(dk)).forEach(r=>{(by[r.time]=by[r.time]||[]).push({n:r.c.name+' ('+((findProgramById(r.c.pid)||{}).name||'-')+')',tag:r.titipFrom?'Titipan dari '+first(getMemberName(r.titipFrom)):r.makeup?'Sesi pengganti':r.pengganti?'Sesi pengganti (undur)':null,cid:r.client})});
   return{co,slots:Object.keys(by).sort().map(t=>({co,t,names:by[t],rec:store.attSlot[dk+'|'+co+'|'+t]||null,ok:attOpen(dk,t)}))}});
  const all_=[].concat(...per.map(x=>x.slots));
  const done=all_.filter(x=>x.rec).length,open=all_.filter(x=>!x.rec&&x.ok).length,lock=all_.filter(x=>!x.rec&&!x.ok).length;
@@ -42,7 +42,19 @@ function attList(){
   const body=appState.attCompact
    ?`<div style="flex:1;min-width:200px"><b>${x.t} - ${end} WIB</b><small>${all?esc(first(getMemberName(co)))+' · ':''}${esc(locOf(co))} · ${x.names.map(e=>esc(e.n.slice(0,e.n.lastIndexOf(' (')))).join(', ')}</small>${tags?`<small style="color:var(--warn);font-weight:700">${tags}</small>`:''}</div>`
    :`<div style="flex:1;min-width:220px"><small style="color:${x.rec?'var(--good)':'var(--warn)'};font-weight:700">${x.rec?esc(getMemberName(co))+', absensi jadwal ini sudah dikonfirmasi.':(isC?esc(getMemberName(co))+', kamu memiliki jadwal absensi yang harus kamu konfirmasi.':esc(getMemberName(co))+' memiliki jadwal absensi yang harus dikonfirmasi.')}</small><b>Jadwal melatih ${x.t} - ${end} WIB</b><small><b>Coach:</b> ${esc(getMemberName(co))}</small><small><b>Lokasi melatih:</b> ${esc(locOf(co))}</small><small><b>Klien yang dilatih:</b> ${x.names.map(e=>esc(e.n)+(e.tag?' · '+esc(e.tag):'')).join('; ')}</small><small><b>Absensi bisa diisi:</b> mulai pukul ${end} (setelah jadwal selesai)</small>${x.rec?`<small><b>Status:</b> ${x.rec.s==='Hadir'?'Coach hadir melatih':'Coach tidak hadir'}, dikonfirmasi oleh ${esc(x.rec.by)} pukul ${x.rec.at}</small>`:''}</div>`;
-  return `<div class="li" style="align-items:flex-start;flex-wrap:wrap;gap:8px">${body}<div class="acts">${info}${btns}</div></div>`};
+  /* Kehadiran per peserta (komisi semi privat): bila slot ini berisi pasangan
+     semi privat (dua klien, grp sama, program semi), tampilkan tombol
+     Hadir/Tidak hadir per peserta di bawah tombol coach. Aktif saat slot
+     terbuka; tidak bermakna bila coach ditandai "Tidak hadir". */
+  const pair=(()=>{const cs=x.names.map(e=>findClientById(e.cid)).filter(Boolean);
+   const byGrp={};cs.forEach(c=>{if(!c.grp)return;(byGrp[c.grp]=byGrp[c.grp]||[]).push(c)});
+   for(const g of Object.values(byGrp)){if(g.length===2&&g.every(c=>isSemi(findProgramById(c.pid))))return g}
+   return null})();
+  const pairBtns=pair?`<div style="flex-basis:100%"><small class="sub" style="display:block;margin-bottom:2px">Kehadiran peserta (paket semi privat — menentukan komisi sesi):</small>${pair.map(c=>{
+   const pst=(store.attClient[dk+'|'+co+'|'+x.t+'|'+c.id]||{}).s;
+   const dis=!x.ok||st==='Tidak hadir';
+   return `<div class="row" style="gap:6px;align-items:center;margin-top:4px"><span class="sub" style="min-width:140px">${esc(c.name)}</span>`+['Hadir','Tidak hadir'].map(v=>`<button class="btn sm ${pst===v?'primary':''}" data-act="cattclient" data-d="${dk}" data-co="${co}" data-t="${x.t}" data-c="${c.id}" data-s="${v}" ${dis?'disabled':''} aria-pressed="${pst===v}">${v}</button>`).join('')+`</div>`}).join('')}</div>`:'';
+  return `<div class="li" style="align-items:flex-start;flex-wrap:wrap;gap:8px">${body}<div class="acts">${info}${btns}</div>${pairBtns}</div>`};
  const list=all
   ?per.map(x=>`<div class="listv"><h4 style="margin:6px 0 0;font-size:14px">${esc(getMemberName(x.co))} <span class="sub">· ${esc(locOf(x.co))} · ${x.slots.length} jadwal</span></h4>${x.slots.map(item).join('')||jejakHtml(x.co)||'<p class="sub" style="margin:0">Tidak ada jadwal melatih pada tanggal ini.</p>'}</div>`).join('')
   :(all_.map(item).join('')||jejakHtml(sel)||'<section class="card"><p class="sub">Tidak ada jadwal melatih pada tanggal ini.</p></section>');
@@ -104,6 +116,21 @@ ACT.cattset=async t=>{
  else store.attCoach[co][k]={status:'Alpha'};
  logAct('mengonfirmasi absensi coach '+getMemberName(co)+' ('+v+') '+tm);
  toast('Absensi '+first(getMemberName(co))+' jam '+tm+': '+v);render()};
+/* Kehadiran per peserta (komisi semi privat): satu tombol per anggota pasangan.
+   Hanya bermakna bila coach hadir — bila coach "Tidak hadir", tidak ada sesi. */
+ACT.cattclient=async t=>{
+ const k=t.dataset.d,co=t.dataset.co,tm=t.dataset.t,cid=t.dataset.c,v=t.dataset.s;
+ if(!['Hadir','Tidak hadir'].includes(v)||!COACHES.includes(co))return;
+ if(appState.role==='coach'&&co!==meId()){toast('Hanya bisa mengisi absensi Anda sendiri');return}
+ if(parseDate(k)>TODAY||!attOpen(k,tm)){toast('Belum bisa diisi. Terbuka pukul '+hhmm(attOpenAt(k,tm))+' (jadwal selesai)');render();return}
+ const rec=(store.attSlot||{})[k+'|'+co+'|'+tm];
+ if(rec&&rec.s==='Tidak hadir'){toast('Coach tidak hadir — tidak ada sesi yang bisa ditandai');render();return}
+ store.attClient=store.attClient||{};
+ store.attClient[k+'|'+co+'|'+tm+'|'+cid]={s:v,by:meUser().name,at:hhmm(new Date())};
+ if(isApiMode()){try{await apiSaveClientAttendance(k,co,tm,cid,v,meUser().name,hhmm(new Date()))}catch(e){console.error('Gagal simpan absensi peserta:',e);toast('Gagal simpan ke server: '+(e.message||e));delete store.attClient[k+'|'+co+'|'+tm+'|'+cid];render();return}}
+ const c=findClientById(cid);
+ logAct('mengonfirmasi kehadiran peserta '+(c?c.name:cid)+' ('+v+') '+tm);
+ toast((c?c.name:cid)+': '+v);render()};
 /* Komisi Bulanan Fase A — dukungan DIUNDUR (keputusan pemilik): sesi klien yang
    hilang karena izin/cuti coach diganti di ekor masa program; tanggal selesai
    klien digeser maju sejumlah sesi yang hilang. undurHitung menghitung dampak

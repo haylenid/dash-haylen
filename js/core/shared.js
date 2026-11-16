@@ -104,17 +104,17 @@ function sessionsOn(id,date){
  const k=iso(date),di=dIdx(date);
  if(offOn(id,k))return[];
  const own=store.book.filter(b=>b.coach===id&&b.day===di&&findClientById(b.client)&&!findClientById(b.client).arch)
-  .filter(b=>!offSlot(id,k,b.time)).map(b=>{const cc=findClientById(b.client);return{...b,date:k,c:cc,att:store.attClient[k+'|'+b.client]||null,pengganti:!!(cc.end_orig&&k>cc.end_orig)}});
+  .filter(b=>!offSlot(id,k,b.time)).map(b=>{const cc=findClientById(b.client);return{...b,date:k,c:cc,att:store.attClient[k+'|'+b.coach+'|'+b.time+'|'+b.client]||null,pengganti:!!(cc.end_orig&&k>cc.end_orig)}});
  // Komisi Bulanan Fase C: klien titipan untuk coach ini pada tanggal ini ikut
  // tampil di Daftar Hadir pengganti (bertanda titipFrom = coach pemilik klien).
  const titipan=(store.titip||[]).filter(t=>t.to===id&&t.date===k&&findClientById(t.client)&&!findClientById(t.client).arch)
-  .map(t=>({coach:id,client:t.client,day:di,time:t.time,date:k,c:findClientById(t.client),att:store.attClient[k+'|'+t.client]||null,titipFrom:t.from}));
+  .map(t=>({coach:id,client:t.client,day:di,time:t.time,date:k,c:findClientById(t.client),att:store.attClient[k+'|'+id+'|'+t.time+'|'+t.client]||null,titipFrom:t.from}));
  // Sesi pengganti (undur terjadwal manual): catatan tanggal + jam untuk coach ini
  // ikut tampil bertanda makeup; yang kebetulan sama persis dengan slot pola klien
  // tidak digandakan (slot polanya sendiri sudah tampil di atas).
  const gnti=(store.makeup||[]).filter(t=>t.coach===id&&t.date===k&&findClientById(t.client)&&!findClientById(t.client).arch)
   .filter(t=>!own.some(o=>o.client===t.client&&o.time===t.time))
-  .map(t=>({coach:id,client:t.client,day:di,time:t.time,date:k,c:findClientById(t.client),att:store.attClient[k+'|'+t.client]||null,makeup:true,pengganti:true}));
+  .map(t=>({coach:id,client:t.client,day:di,time:t.time,date:k,c:findClientById(t.client),att:store.attClient[k+'|'+t.coach+'|'+t.time+'|'+t.client]||null,makeup:true,pengganti:true}));
  return own.concat(titipan).concat(gnti).sort((a,b)=>a.time<b.time?-1:1);
 }
 function upcoming(id,n){
