@@ -20,7 +20,7 @@ function hero(){
  const pd=getPendingCorrections(co).length;
  const lanes=[0,1,2,3,4].map(i=>`<path d="M${-20+i*18} 230C${-20+i*18} ${110-i*4} ${140+i*10} ${20+i*14} ${330+i*6} ${20+i*14}S540 ${40+i*14} 540 ${40+i*14}"/>`).join('');
  return `<section class="hero"><svg class="lanes" viewBox="0 0 540 240" fill="none" stroke="#fff" stroke-width="2" aria-hidden="true">${lanes}</svg><div><p class="eyebrow">${DAYSL[dIdx(TODAY)]}, ${fmtD(TODAY)}</p><h2>${g}, ${esc(first(meUser().name))}</h2><p class="lead">${co?'Sesi dan koreksi Anda hari ini.':'Ringkasan latihan, klien, dan bisnis dalam satu layar.'}</p></div><div class="hstats"><div class="hs"><b>${live}</b><span>klien berjalan</span></div><div class="hs"><b>${ses}</b><span>sesi hari ini</span></div><div class="hs"><b>${pd}</b><span>menunggu koreksi</span></div></div></section>`}
-function activityCard(cls){return `<section class="card ${cls}"><header class="ch"><h3>Aktivitas sinkronisasi</h3><span class="sub">Dari portal Pemilik dan Coach</span></header><div class="listv">${store.log.slice(0,6).map(l=>`<div class="li"><div><b>${esc(l.who)}</b><small>${esc(l.text)}</small></div><span class="sub mono">${ago(l.t)}</span></div>`).join('')}</div></section>`}
+function activityCard(cls){return `<section class="card ${cls} activity"><header class="ch"><h3>Aktivitas sinkronisasi</h3><span class="sub">Dari portal Pemilik dan Coach</span></header><div class="listv">${store.log.slice(0,6).map(l=>`<div class="li"><div><b>${esc(l.who)}</b><small>${esc(l.text)}</small></div><span class="sub mono">${ago(l.t)}</span></div>`).join('')}</div></section>`}
 /* Rapikan baris kartu c4 (3 per baris di layar lebar): bila baris terakhir tidak penuh, kartu terakhir diperlebar mengisi ruang kosong */
 function c4fit(list){
  const r=list.length%3,w=r===1?['c12']:r===2?['c6','c6']:[];
@@ -43,7 +43,7 @@ function renderCoachHome(){
  const kom=sum(getSessionAttendance(30,myId).map(x=>x.fee));
  const fr=freeSlots(7,myId);
  return `<div class="stackv">
- ${banner('Portal Coach. Anda hanya melihat klien dan jadwal milik sendiri. Absen, izin, dan jadwal Anda langsung muncul di portal Pemilik. Koreksi laporan klien dikerjakan Head Coach.')}
+ ${banner('Portal Coach. Anda hanya melihat klien dan jadwal milik sendiri. Absen, izin, dan jadwal Anda langsung muncul di portal Pemilik. Koreksi laporan klien dikerjakan Head Coach.','info')}
  <div class="kpis">${kpi('Klien saya',lv.length,'berjalan')}${kpi('Slot kosong',fr.length,'7 hari ke depan')}${kpi('Sesi hari ini',today.length,DAYSL[dIdx(TODAY)])}${kpi('Komisi 30 hari',perm('komisi')==='none'?'-':money(kom,'komisi'),'bagian Anda')}</div>
  <div class="dash">
   <section class="card c6"><header class="ch"><h3>Absensi hari ini</h3><button class="btn sm" data-act="nav" data-v="absensi">Isi absensi</button></header><div style="margin-bottom:8px">${attPill(myId)}</div><p class="sub">Status kehadiran Anda hari ini.</p></section>

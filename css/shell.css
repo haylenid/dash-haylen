@@ -45,6 +45,8 @@ h1{font-size:clamp(26px,3.6vw,34px);line-height:1.08}
 /* Tab "Login & sesi" di Pengaturan disembunyikan (permintaan 2026-11-18);
    isinya (t===1) tetap ada, hanya tombolnya yang tidak tampil. */
 .stackv.setting nav.tabs button[data-v="1"]{display:none}
+/* Kartu "Aktivitas sinkronisasi" di Beranda disembunyikan (permintaan 2026-11-18) */
+.card.activity{display:none}
 .bnav,.rolechip{display:none}
 .mlist{display:none;flex-direction:column;gap:8px}
 .bdg{position:absolute;top:-3px;right:3px;min-width:16px;height:16px;border-radius:8px;background:var(--bad);color:var(--surface);font-size:10px;font-weight:700;display:grid;place-items:center;padding:0 4px;font-style:normal}
