@@ -30,7 +30,7 @@ PAGES.setting=()=>{
   body=`<section class="card"><header class="ch"><h3>Daftar kota</h3><span class="sub">${cities.length} kota</span></header><p class="sub">Kota dipakai untuk tarif program & komisi per kota. Klien dan coach wajib punya kota; kota yang masih dipakai tidak bisa dihapus.</p>
   ${cities.length?`<div class="listv">${cities.map(c=>{const u=used(c.id);return `<div class="li"><div><b>${esc(c.name)}</b><small>${u.klien} klien · ${u.anggota} anggota · ${u.tarif} tarif program</small></div><div class="row"><button class="btn sm" data-act="modal" data-v="cityedit" data-id="${c.id}">${icon('edit',14)} Edit</button><button class="btn sm danger" data-act="askcity" data-v="${c.id}">${icon('trash',14)} Hapus</button></div></div>`}).join('')}</div>`:`<p class="sub">Belum ada kota. Tambahkan kota pertama di bawah ini.</p>`}
   <form data-form="city" class="fg" style="margin-top:12px"><label class="field"><span>Nama kota baru</span><input id="f-city" name="name" required placeholder="Contoh: Kediri"></label><div class="row full"><button class="btn primary" type="submit">Tambah kota</button></div></form></section>`}
- return `<div class="stackv">${tabsBar(tabs)}${body}</div>`};
+ return `<div class="stackv setting">${tabsBar(tabs)}${body}</div>`};
 ACT.syncreset=()=>syncReset();
 ACT.aclsave=async()=>{
   if(!isApiMode()){toast('Tersimpan lokal');return}

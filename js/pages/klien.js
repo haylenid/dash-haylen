@@ -185,11 +185,26 @@ ACT.dlinvoice=async()=>{
  const f=document.querySelector('.sheet form[data-form="client"]');if(!f)return;
  if(!f.reportValidity())return;
  try{
-  const fd=new FormData(f),p=findProgramById(fd.get('pid')),id=fd.get('id'),k=id?findClientById(id):null,uid=k?k.uid:nextClientUid();
-  const paketSemi=isSemi(p)&&(fd.get('name2')||'').trim(),d={name:fd.get('name').trim()+(paketSemi?' & '+fd.get('name2').trim():''),uid,no:'INV-'+iso(TODAY).replace(/-/g,'')+'-'+uid.replace('HY-',''),prog:p.name,unit:(p.unit||'')+(paketSemi?' · 2 peserta':''),price:priceFor(p.id,fd.get('city')||(k&&k.city_id)),start:fd.get('start'),end:fd.get('end')};
+  const fd=new FormData(f),p=findProgramById(fd.get('pid')),id=fd.get('id'),k=id?findClientById(id):null,uid1=k?k.uid:nextClientUid();
+  const name1=fd.get('name').trim(),name2=(fd.get('name2')||'').trim(),paketSemi=isSemi(p)&&name2;
+  const total=priceFor(p.id,fd.get('city')||(k&&k.city_id)),start=fd.get('start'),end=fd.get('end');
+  const mk=(name,uid,price)=>({name,uid,no:'INV-'+iso(TODAY).replace(/-/g,'')+'-'+String(uid||'').replace('HY-',''),prog:p.name,unit:p.unit||'',price,start,end});
+  let list;
+  if(paketSemi){
+   /* Invoice pasangan dipisah per orang (2026-11-18): tiap peserta ditagih
+      setengah harga paket; jumlah keduanya tetap sama dengan harga paket. */
+   const partner=(k&&partnerOf(k))||(fd.get('pasangan_id')?findClientById(fd.get('pasangan_id')):null);
+   const uid2=partner&&partner.uid?partner.uid:'HY-'+(parseInt(String(uid1).slice(3)||'1001',10)+1);
+   const p1=Math.ceil(total/2);
+   list=[mk(name1,uid1,p1),mk(name2,uid2,total-p1)];
+  }else{
+   list=[mk(name1,uid1,total)];
+  }
   try{await Promise.all(['500','600','700','800'].map(w=>document.fonts.load(w+' 20px Montserrat')))}catch(e){}await awaitLogo();
-  const cv=invoiceCanvas(d),a=document.createElement('a');a.href=cv.toDataURL('image/jpeg',.92);a.download='invoice-'+slug(d.name)+'-'+iso(TODAY)+'.jpg';document.body.appendChild(a);a.click();a.remove();
-  logAct('mencetak invoice '+d.name);toast('Invoice diunduh sebagai JPG');
+  for(const d of list){
+   const cv=invoiceCanvas(d),a=document.createElement('a');a.href=cv.toDataURL('image/jpeg',.92);a.download='invoice-'+slug(d.name)+'-'+iso(TODAY)+'.jpg';document.body.appendChild(a);a.click();a.remove();
+  }
+  logAct('mencetak invoice '+list.map(d=>d.name).join(' & '));toast(list.length>1?list.length+' invoice diunduh sebagai JPG (satu per peserta)':'Invoice diunduh sebagai JPG');
  }catch(e){console.error(e);toast('Gagal membuat invoice')}
 };
 Object.assign(ACT,{
